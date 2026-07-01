@@ -145,7 +145,7 @@ const getSvgViewWidth = (svgString) => {
 //   Primer tspan: y="yBase" (posición absoluta original)
 //   Resto:        dy="1.2em" (relativo al font-size, se adapta automáticamente)
 // ─────────────────────────────────────────────────────────────────────────────
-const buildTspans = (text, xAnchor, yBase, charsPerLine) => {
+const buildTspans = (text, xAnchor, yBase, charsPerLine, fontSizeStyle = '') => {
     const words = text.split(/\s+/).filter(Boolean);
     const lines = [];
     let currentLine = '';
@@ -161,9 +161,11 @@ const buildTspans = (text, xAnchor, yBase, charsPerLine) => {
     }
     if (currentLine) lines.push(currentLine);
 
+    const styleAttr = fontSizeStyle ? ` style="${fontSizeStyle}"` : '';
+
     return lines.map((line, i) => {
-        if (i === 0) return `<tspan x="${xAnchor}" y="${yBase}">${line}</tspan>`;
-        return `<tspan x="${xAnchor}" dy="1.2em">${line}</tspan>`;
+        if (i === 0) return `<tspan x="${xAnchor}" y="${yBase}"${styleAttr}>${line}</tspan>`;
+        return `<tspan x="${xAnchor}" dy="1.2em"${styleAttr}>${line}</tspan>`;
     }).join('\n');
 };
 
@@ -280,15 +282,6 @@ const replaceVariables = (svgString, rowData) => {
             const yVal = getAttr(tspanAttrs, 'y') || '0';
             const plainText = tspanContent.replace(regex, val).trim();
 
-            if (val.length <= 28) {
-                // Texto corto: reemplazo directo en el mismo tspan
-                console.log(`[svgParser] 🔤 Corto "${key}": x=${xVal} y=${yVal}`);
-                return `<tspan${tspanAttrs}>${plainText}</tspan>`;
-            }
-
-            // Texto largo: calcular charsPerLine desde font-size real del CSS
-            // Buscar qué clase CSS aplica a este tspan (puede venir del <text> padre
-            // vía herencia, por eso buscamos también en el contexto circundante)
             const tspanClass = getAttr(tspanAttrs, 'class') || '';
 
             // Buscar font-size en las clases del tspan; si no, usar font-size inline
@@ -324,11 +317,60 @@ const replaceVariables = (svgString, rowData) => {
             }
 
             const boxWidth = getBoxWidth(tspanAttrs, svgViewWidth);
-            const charsPerLine = calcCharsPerLine(fontSize, boxWidth);
 
-            console.log(`[svgParser] 📐 Word-wrap "${key}": fontSize=${fontSize}px boxWidth=${Math.round(boxWidth)}px → charsPerLine=${charsPerLine}`);
+            // Determinar si es un campo de una sola línea (Nombre, Puesto, Correo, etc.)
+            const singleLineKeys = ['nombre', 'puesto', 'telefono', 'correo', 'email', 'phone', 'celular', 'web', 'url', 'sitio', 'address', 'direccion'];
+            const isSingleLine = singleLineKeys.some(k => normalize(key).includes(k));
 
-            const tspans = buildTspans(plainText, xVal, yVal, charsPerLine);
+            if (isSingleLine) {
+                const textWidth = plainText.length * (fontSize * 0.52);
+                if (textWidth > boxWidth) {
+                    let newFontSize = boxWidth / (plainText.length * 0.52);
+                    const minFontSize = fontSize * 0.5; // No reducir más del 50%
+                    if (newFontSize < minFontSize) newFontSize = minFontSize;
+                    newFontSize = Math.round(newFontSize * 100) / 100;
+
+                    console.log(`[svgParser] 📐 Auto-scale "${key}": fontSize ${fontSize}px -> ${newFontSize}px (textWidth ${Math.round(textWidth)}px > boxWidth ${Math.round(boxWidth)}px)`);
+                    
+                    let updatedAttrs = tspanAttrs;
+                    const styleAttr = getAttr(tspanAttrs, 'style');
+                    if (styleAttr) {
+                        if (styleAttr.includes('font-size')) {
+                            const updatedStyle = styleAttr.replace(/font-size\s*:\s*[^;]+(;?)/i, `font-size: ${newFontSize}px$1`);
+                            updatedAttrs = updatedAttrs.replace(`style="${styleAttr}"`, `style="${updatedStyle}"`);
+                        } else {
+                            const updatedStyle = styleAttr.endsWith(';') ? `${styleAttr} font-size: ${newFontSize}px;` : `${styleAttr}; font-size: ${newFontSize}px;`;
+                            updatedAttrs = updatedAttrs.replace(`style="${styleAttr}"`, `style="${updatedStyle}"`);
+                        }
+                    } else {
+                        updatedAttrs = `${updatedAttrs} style="font-size: ${newFontSize}px;"`;
+                    }
+                    return `<tspan${updatedAttrs}>${plainText}</tspan>`;
+                } else {
+                    console.log(`[svgParser] 🔤 Corto "${key}": x=${xVal} y=${yVal}`);
+                    return `<tspan${tspanAttrs}>${plainText}</tspan>`;
+                }
+            }
+
+            // Caso Multi-línea (Textarea / Descripciones): Word-wrap
+            let charsPerLine = calcCharsPerLine(fontSize, boxWidth);
+            let estimatedLines = Math.ceil(plainText.length / charsPerLine);
+            let adjustedFontSize = fontSize;
+            let fontSizeStyle = '';
+
+            // Si tiene muchas líneas, reducimos un poco el tamaño de fuente para evitar desborde vertical
+            if (estimatedLines > 3) {
+                adjustedFontSize = fontSize * 0.85; // reducir 15%
+                if (estimatedLines > 6) adjustedFontSize = fontSize * 0.7; // reducir 30%
+                adjustedFontSize = Math.round(adjustedFontSize * 100) / 100;
+                charsPerLine = calcCharsPerLine(adjustedFontSize, boxWidth);
+                fontSizeStyle = `font-size: ${adjustedFontSize}px;`;
+                console.log(`[svgParser] 📐 Escalamiento multilínea para "${key}": ${fontSize}px -> ${adjustedFontSize}px`);
+            }
+
+            console.log(`[svgParser] 📐 Word-wrap "${key}": fontSize=${adjustedFontSize}px boxWidth=${Math.round(boxWidth)}px → charsPerLine=${charsPerLine}`);
+
+            const tspans = buildTspans(plainText, xVal, yVal, charsPerLine, fontSizeStyle);
             const lineCount = tspans.split('<tspan').length - 1;
             console.log(`[svgParser]    → ${lineCount} líneas generadas`);
 
@@ -346,18 +388,60 @@ const replaceVariables = (svgString, rowData) => {
         newSvg = newSvg.replace(textNodeRegex, (match, attrs, content) => {
             matched = true;
             const plainText = content.replace(regex, val).trim();
-            if (val.length > 28) {
-                const xVal = getAttr(attrs, 'x') || '0';
-                const yVal = getAttr(attrs, 'y') || '0';
-                const textClass = getAttr(attrs, 'class') || '';
-                let fontSize = 12;
-                for (const cls of textClass.split(/\s+/)) {
-                    if (cssClasses[cls]?.fontSize) { fontSize = cssClasses[cls].fontSize; break; }
-                }
-                const charsPerLine = calcCharsPerLine(fontSize, svgViewWidth * 0.45);
-                return `<text${attrs}>${buildTspans(plainText, xVal, yVal, charsPerLine)}</text>`;
+            const textClass = getAttr(attrs, 'class') || '';
+            let fontSize = 12;
+            for (const cls of textClass.split(/\s+/)) {
+                if (cssClasses[cls]?.fontSize) { fontSize = cssClasses[cls].fontSize; break; }
             }
-            return `<text${attrs}>${plainText}</text>`;
+
+            const boxWidth = svgViewWidth * 0.45;
+            const singleLineKeys = ['nombre', 'puesto', 'telefono', 'correo', 'email', 'phone', 'celular', 'web', 'url', 'sitio', 'address', 'direccion'];
+            const isSingleLine = singleLineKeys.some(k => normalize(key).includes(k));
+
+            if (isSingleLine) {
+                const textWidth = plainText.length * (fontSize * 0.52);
+                if (textWidth > boxWidth) {
+                    let newFontSize = boxWidth / (plainText.length * 0.52);
+                    const minFontSize = fontSize * 0.5;
+                    if (newFontSize < minFontSize) newFontSize = minFontSize;
+                    newFontSize = Math.round(newFontSize * 100) / 100;
+
+                    console.log(`[svgParser] 📐 Auto-scale (Fallback) "${key}": fontSize ${fontSize}px -> ${newFontSize}px`);
+
+                    let updatedAttrs = attrs;
+                    const styleAttr = getAttr(attrs, 'style');
+                    if (styleAttr) {
+                        if (styleAttr.includes('font-size')) {
+                            const updatedStyle = styleAttr.replace(/font-size\s*:\s*[^;]+(;?)/i, `font-size: ${newFontSize}px$1`);
+                            updatedAttrs = updatedAttrs.replace(`style="${styleAttr}"`, `style="${updatedStyle}"`);
+                        } else {
+                            const updatedStyle = styleAttr.endsWith(';') ? `${styleAttr} font-size: ${newFontSize}px;` : `${styleAttr}; font-size: ${newFontSize}px;`;
+                            updatedAttrs = updatedAttrs.replace(`style="${styleAttr}"`, `style="${updatedStyle}"`);
+                        }
+                    } else {
+                        updatedAttrs = `${updatedAttrs} style="font-size: ${newFontSize}px;"`;
+                    }
+                    return `<text${updatedAttrs}>${plainText}</text>`;
+                }
+                return `<text${attrs}>${plainText}</text>`;
+            }
+
+            const xVal = getAttr(attrs, 'x') || '0';
+            const yVal = getAttr(attrs, 'y') || '0';
+            let charsPerLine = calcCharsPerLine(fontSize, boxWidth);
+            let estimatedLines = Math.ceil(plainText.length / charsPerLine);
+            let adjustedFontSize = fontSize;
+            let fontSizeStyle = '';
+
+            if (estimatedLines > 3) {
+                adjustedFontSize = fontSize * 0.85;
+                if (estimatedLines > 6) adjustedFontSize = fontSize * 0.7;
+                adjustedFontSize = Math.round(adjustedFontSize * 100) / 100;
+                charsPerLine = calcCharsPerLine(adjustedFontSize, boxWidth);
+                fontSizeStyle = `font-size: ${adjustedFontSize}px;`;
+            }
+
+            return `<text${attrs}>${buildTspans(plainText, xVal, yVal, charsPerLine, fontSizeStyle)}</text>`;
         });
 
         if (!matched) {

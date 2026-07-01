@@ -36,7 +36,8 @@ const Generator = () => {
             svgFiles.forEach(f => formData.append('template', f));
             formData.append('data', excelFile);
             
-            const response = await axios.post('http://localhost:3000/api/generator/preview', formData, {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const response = await axios.post(`${API_URL}/api/generator/preview`, formData, {
                 responseType: 'blob'
             });
             
@@ -73,7 +74,8 @@ const Generator = () => {
             formData.append('data', excelFile);
             formData.append('formats', selectedFormats);
 
-            const response = await axios.post('http://localhost:3000/api/generator/generate', formData, {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const response = await axios.post(`${API_URL}/api/generator/generate`, formData, {
                 responseType: 'blob',
             });
 
