@@ -165,13 +165,19 @@ const previewDocument = async (req, res) => {
             return res.status(400).json({ error: 'El Excel está vacío o no es válido.' });
         }
 
+        let rowIndex = parseInt(req.body.rowIndex || 0, 10);
+        if (isNaN(rowIndex) || rowIndex < 0 || rowIndex >= dataRows.length) {
+            rowIndex = 0;
+        }
+
         // Previsualizar con la última plantilla subida (más probable que tenga variables)
         const lastTemplate = templateFiles[templateFiles.length - 1];
         const svgWithFonts = await svgParserService.injectFontsToSVG(lastTemplate.buffer.toString('utf-8'));
-        const parsedSvg = svgParserService.replaceVariables(svgWithFonts, dataRows[0]);
+        const parsedSvg = svgParserService.replaceVariables(svgWithFonts, dataRows[rowIndex]);
 
         const imgBuffer = await puppeteerService.renderToImage(parsedSvg, 'png');
         res.setHeader('Content-Type', 'image/png');
+        res.setHeader('x-total-rows', dataRows.length.toString());
         return res.end(imgBuffer);
 
     } catch (error) {
