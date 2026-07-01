@@ -176,9 +176,59 @@ const executeConcurrently = async (promiseFns, limit, archive) => {
     return Promise.all(results);
 };
 
+const renderBatchToImage = async (svgArray, format = 'png') => {
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+    const buffers = [];
+    
+    try {
+        for (const svgString of svgArray) {
+            const html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body, html { margin: 0; padding: 0; display: inline-block; }
+                        svg { display: block; }
+                    </style>
+                </head>
+                <body>
+                    ${svgString}
+                </body>
+                </html>
+            `;
+            
+            await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
+            await new Promise(r => setTimeout(r, 150));
+            
+            const dimensions = await setupSvgDimensions(page);
+            await page.setViewport({ width: dimensions.width, height: dimensions.height });
+            
+            const svgElement = await page.$('svg');
+            if (!svgElement) throw new Error('No SVG element found');
+            
+            const imgBuffer = await svgElement.screenshot({
+                type: format === 'jpg' ? 'jpeg' : 'png',
+                omitBackground: format === 'png',
+                quality: format === 'jpg' ? 90 : undefined
+            });
+            
+            buffers.push(Buffer.from(imgBuffer));
+        }
+        
+        await page.close();
+        return buffers;
+    } catch (error) {
+        console.error('ERROR_RENDERIZADO_LOTE:', error.message);
+        await page.close().catch(() => {});
+        throw error;
+    }
+};
+
 module.exports = {
     renderToPdf,
     renderToImage,
     executeConcurrently,
-    getBrowser
+    getBrowser,
+    renderBatchToImage
 };

@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@theme {
+  --color-petrol: #2A5757;
+  --color-orange-garza: #E0922B;
+}

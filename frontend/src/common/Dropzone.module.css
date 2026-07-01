@@ -53,18 +53,18 @@
 }
 
 .excelDropzone {
-    border-color: rgba(52, 199, 89, 0.3);
+    border-color: rgba(42, 87, 87, 0.4);
 }
 
 .excelDropzone:hover {
-    border-color: var(--color-success);
-    background-color: rgba(52, 199, 89, 0.02);
+    border-color: #2A5757;
+    background-color: rgba(42, 87, 87, 0.02);
 }
 
 .active {
-    border-color: var(--color-accent);
+    border-color: #2A5757;
     border-style: dashed;
-    background-color: rgba(243, 112, 33, 0.03);
+    background-color: rgba(42, 87, 87, 0.05);
     opacity: 1;
 }
 
