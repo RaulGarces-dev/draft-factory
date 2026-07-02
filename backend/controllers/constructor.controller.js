@@ -47,7 +47,7 @@ const generateBatch = async (req, res) => {
       }
 
       // Ensamblar SVG
-      const svgContent = ensamblar(instruccionIA);
+      const svgContent = await ensamblar(instruccionIA);
       if (svgContent) {
         svgsEnsamblados.push(svgContent);
         metadatosFilas.push(fila.Nombre || fila.Evento || `Tarjeta_${i+1}`);

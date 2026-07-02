@@ -1,7 +1,7 @@
-const { ZipArchive } = require('archiver');
+const archiver = require('archiver');
 
 const createZipStream = (res) => {
-    const archive = new ZipArchive({
+    const archive = archiver('zip', {
         zlib: { level: 9 }
     });
 

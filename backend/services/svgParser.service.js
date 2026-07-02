@@ -320,7 +320,7 @@ const replaceVariables = (svgString, rowData) => {
 
             // Determinar si es un campo de una sola línea (Nombre, Puesto, Correo, etc.)
             const singleLineKeys = ['nombre', 'puesto', 'telefono', 'correo', 'email', 'phone', 'celular', 'web', 'url', 'sitio', 'address', 'direccion'];
-            const isSingleLine = singleLineKeys.some(k => normalize(key).includes(k));
+            const isSingleLine = singleLineKeys.some(k => normalize(key).includes(k)) || plainText.trim().length < 40 || !plainText.trim().includes(' ');
 
             if (isSingleLine) {
                 const textWidth = plainText.length * (fontSize * 0.52);

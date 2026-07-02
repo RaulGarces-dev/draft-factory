@@ -12,7 +12,7 @@ async function test() {
 
   if (result) {
     console.log('Testing Ensamblador...');
-    const svg = ensamblar(result);
+    const svg = await ensamblar(result);
     console.log('SVG length:', svg ? svg.length : 'NULL');
   }
 }
