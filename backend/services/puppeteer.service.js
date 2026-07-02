@@ -198,7 +198,7 @@ const renderBatchToImage = async (svgArray, format = 'png') => {
                 </html>
             `;
             
-            await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
+            await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 10000 });
             await new Promise(r => setTimeout(r, 150));
             
             const dimensions = await setupSvgDimensions(page);

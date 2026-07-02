@@ -59,7 +59,20 @@ export default function ConstructorView() {
     } catch (error) {
       clearInterval(stepInterval);
       console.error(error);
-      const msg = error.response?.data?.error || 'Hubo un error al generar los documentos.';
+      let msg = 'Hubo un error al generar los documentos.';
+      
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const json = JSON.parse(text);
+          if (json.error) msg = json.error;
+        } catch (e) {
+          // ignore parsing error
+        }
+      } else if (error.response?.data?.error) {
+        msg = error.response.data.error;
+      }
+      
       toast.error(msg);
     } finally {
       setIsGenerating(false);

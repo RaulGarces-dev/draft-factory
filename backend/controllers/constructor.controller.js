@@ -61,6 +61,10 @@ const generateBatch = async (req, res) => {
     // 3. Puppeteer Render en lote
     const pngBuffers = await renderBatchToImage(svgsEnsamblados, 'png');
 
+    if (!pngBuffers || pngBuffers.length === 0) { 
+      return res.status(500).json({ error: "Ninguna fila se pudo procesar. Revisa los logs de Gemini." }); 
+    }
+
     // 4. Archiver
     res.attachment('campana_automatizada.zip');
     const archive = archiver('zip', { zlib: { level: 9 } });
@@ -81,7 +85,8 @@ const generateBatch = async (req, res) => {
     await archive.finalize();
 
   } catch (error) {
-    console.error('[generateBatch] Error general:', error);
+    console.error('[generateBatch] Error general:', error.message);
+    console.error(error.stack);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Error interno en la generación del lote.' });
     }
