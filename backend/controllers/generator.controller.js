@@ -5,31 +5,82 @@ const pptxService = require('../services/pptx.service');
 const pdfMergeService = require('../services/pdfMerge.service');
 const streamUtil = require('../utils/stream.util');
 
+// Helper para convertir el lote de imágenes subidas en un mapa indexado por nombre de archivo
+const buildImagesMap = (req) => {
+    const imagesMap = {};
+    const imageFiles = req.files && req.files['images'] ? req.files['images'] : [];
+    for (const file of imageFiles) {
+        const base64 = file.buffer.toString('base64');
+        const ext = file.originalname.split('.').pop().toLowerCase();
+        let mimeType = `image/${ext === 'jpg' || ext === 'jpeg' ? 'jpeg' : ext}`;
+        if (ext === 'svg') mimeType = 'image/svg+xml';
+        // Guardamos indexando por el nombre de archivo en minúsculas
+        imagesMap[file.originalname.toLowerCase().trim()] = `data:${mimeType};base64,${base64}`;
+    }
+    return imagesMap;
+};
+
+// Helper para resolver nombres de imágenes en rowData convirtiéndolos a Base64 si se subieron en el lote
+const resolveImageVariables = (rowData, imagesMap) => {
+    const resolved = { ...rowData };
+    const findUploadedImage = (filename) => {
+        if (!filename) return null;
+        const cleanName = filename.toLowerCase().trim();
+        // Coincidencia exacta
+        if (imagesMap[cleanName]) return imagesMap[cleanName];
+        
+        // Coincidencia sin extensión
+        const keys = Object.keys(imagesMap);
+        for (const key of keys) {
+            const lastDot = key.lastIndexOf('.');
+            const keyWithoutExt = lastDot !== -1 ? key.substring(0, lastDot) : key;
+            if (keyWithoutExt === cleanName) {
+                return imagesMap[key];
+            }
+        }
+        return null;
+    };
+
+    for (const key of Object.keys(resolved)) {
+        const val = resolved[key];
+        if (val && typeof val === 'string' && !val.startsWith('http') && !val.startsWith('data:')) {
+            const imgDataUri = findUploadedImage(val);
+            if (imgDataUri) {
+                resolved[key] = imgDataUri;
+            }
+        }
+    }
+    return resolved;
+};
+
+// Helper para obtener las filas de datos desde excel o json
+const extractDataRows = (req) => {
+    const dataFile = req.files && req.files['data'] ? req.files['data'][0] : null;
+    const rowsJson = req.body.rows;
+    if (rowsJson) {
+        return JSON.parse(rowsJson);
+    } else if (dataFile) {
+        return excelService.parseExcelBuffer(dataFile.buffer);
+    }
+    return null;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Genera documentos para todas las filas del Excel.
-// Soporta múltiples plantillas SVG (ej: cara frontal + cara trasera).
-// Detecta si una plantilla tiene variables o es estática:
-//  - Estáticas: Se renderizan UNA vez. Si es imagen/pptx, se añaden al zip una vez.
-//  - Variables: Se renderizan por cada fila del Excel.
-//  - PDF: Se crea un PDF por persona que intercala las caras estáticas y variables.
+// Genera documentos para todas las filas.
 // ─────────────────────────────────────────────────────────────────────────────
 const generateDocuments = async (req, res) => {
     try {
-        const templateFiles = req.files['template'] || [];
-        const dataFile = req.files['data'] ? req.files['data'][0] : null;
-
+        const templateFiles = req.files && req.files['template'] ? req.files['template'] : [];
         const formats = req.body.formats ? req.body.formats.split(',') : ['pdf'];
+        const dataRows = extractDataRows(req);
 
-        if (!templateFiles.length || !dataFile) {
-            return res.status(400).json({ error: 'Faltan archivos requeridos.' });
-        }
-
-        const dataRows = excelService.parseExcelBuffer(dataFile.buffer);
-        if (!dataRows || dataRows.length === 0) {
-            return res.status(400).json({ error: 'El Excel está vacío o no es válido.' });
+        if (!templateFiles.length || !dataRows || dataRows.length === 0) {
+            return res.status(400).json({ error: 'Faltan archivos o datos requeridos.' });
         }
 
         console.log(`[controller] ${templateFiles.length} plantilla(s), ${dataRows.length} fila(s)`);
+
+        const imagesMap = buildImagesMap(req);
 
         const isOnlyPdf = formats.length === 1 && formats.includes('pdf');
         let archive = null;
@@ -57,7 +108,6 @@ const generateDocuments = async (req, res) => {
                         staticRenders[tpl.index].pdf = await puppeteerService.renderToPdf(tpl.svgString);
                     } else if (format === 'png' || format === 'jpg') {
                         staticRenders[tpl.index].img = await puppeteerService.renderToImage(tpl.svgString, format);
-                        // Añadir al ZIP directamente (una sola copia global)
                         if (archive) archive.append(staticRenders[tpl.index].img, { name: `cara_${tpl.index + 1}_estatica.${format}` });
                     } else if (format === 'pptx') {
                         const png = await puppeteerService.renderToImage(tpl.svgString, 'png');
@@ -70,53 +120,57 @@ const generateDocuments = async (req, res) => {
 
         // 3. Renderizar cada fila (solo las plantillas que tienen variables)
         const renderPromises = dataRows.map((row, rowIdx) => async () => {
-            const results = [];
-            const pdfBuffersForPerson = [];
+            try {
+                const results = [];
+                const pdfBuffersForPerson = [];
 
-            for (const tpl of templatesInfo) {
-                if (!tpl.hasVariables) {
-                    // Si es estática, para imágenes ya se añadió al ZIP arriba.
-                    // Para PDF, reutilizamos el buffer estático para intercalarlo en el archivo final.
-                    if (formats.includes('pdf')) {
-                        pdfBuffersForPerson.push(staticRenders[tpl.index].pdf);
+                // Resolver nombres de imágenes a Base64 para esta fila
+                const resolvedRow = resolveImageVariables(row, imagesMap);
+
+                for (const tpl of templatesInfo) {
+                    if (!tpl.hasVariables) {
+                        if (formats.includes('pdf')) {
+                            pdfBuffersForPerson.push(staticRenders[tpl.index].pdf);
+                        }
+                        continue;
                     }
-                    continue;
+
+                    // Es variable: parsear y renderizar
+                    const parsedSvg = svgParserService.replaceVariables(tpl.svgString, resolvedRow);
+                    const id = `doc_${rowIdx + 1}_cara_${tpl.index + 1}`;
+
+                    for (const format of formats) {
+                        if (format === 'pdf') {
+                            const pdfBuf = await puppeteerService.renderToPdf(parsedSvg);
+                            pdfBuffersForPerson.push(pdfBuf);
+                        } else if (format === 'png' || format === 'jpg') {
+                            const imgBuf = await puppeteerService.renderToImage(parsedSvg, format);
+                            results.push({ type: 'img', name: `${id}.${format}`, buffer: imgBuf });
+                        } else if (format === 'pptx') {
+                            const pngBuf = await puppeteerService.renderToImage(parsedSvg, 'png');
+                            const pptxBuf = await pptxService.generatePptx(pngBuf);
+                            results.push({ type: 'pptx', name: `${id}.pptx`, buffer: pptxBuf });
+                        }
+                    }
                 }
 
-                // Es variable: parsear y renderizar para este usuario
-                const parsedSvg = svgParserService.replaceVariables(tpl.svgString, row);
-                const id = `doc_${rowIdx + 1}_cara_${tpl.index + 1}`;
-
-                for (const format of formats) {
-                    if (format === 'pdf') {
-                        const pdfBuf = await puppeteerService.renderToPdf(parsedSvg);
-                        pdfBuffersForPerson.push(pdfBuf);
-                    } else if (format === 'png' || format === 'jpg') {
-                        const imgBuf = await puppeteerService.renderToImage(parsedSvg, format);
-                        results.push({ type: 'img', name: `${id}.${format}`, buffer: imgBuf });
-                    } else if (format === 'pptx') {
-                        const pngBuf = await puppeteerService.renderToImage(parsedSvg, 'png');
-                        const pptxBuf = await pptxService.generatePptx(pngBuf);
-                        results.push({ type: 'pptx', name: `${id}.pptx`, buffer: pptxBuf });
-                    }
+                if (formats.includes('pdf') && pdfBuffersForPerson.length > 0) {
+                    const personPdf = pdfBuffersForPerson.length === 1 
+                        ? pdfBuffersForPerson[0] 
+                        : await pdfMergeService.mergePdfs(pdfBuffersForPerson);
+                    results.push({ type: 'pdf', name: `doc_${rowIdx + 1}.pdf`, buffer: personPdf });
                 }
-            }
 
-            // Unir todos los PDFs de esta persona en uno solo (ej. Frente y Reverso combinados)
-            if (formats.includes('pdf') && pdfBuffersForPerson.length > 0) {
-                const personPdf = pdfBuffersForPerson.length === 1 
-                    ? pdfBuffersForPerson[0] 
-                    : await pdfMergeService.mergePdfs(pdfBuffersForPerson);
-                results.push({ type: 'pdf', name: `doc_${rowIdx + 1}.pdf`, buffer: personPdf });
+                return results;
+            } catch (cardError) {
+                console.error(`[controller] Error procesando fila ${rowIdx + 1}:`, cardError);
+                return [];
             }
-
-            return results;
         });
 
         const allResults = await puppeteerService.executeConcurrently(renderPromises, 3, archive);
 
         if (formats.includes('pdf')) {
-            // Extraer PDFs por persona y unirlos todos en un master
             const pdfBuffers = allResults.map(resArray => {
                 const pdfItem = resArray.find(i => i.type === 'pdf');
                 return pdfItem ? pdfItem.buffer : null;
@@ -148,21 +202,15 @@ const generateDocuments = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Previsualización: renderiza la primera fila del Excel con la ÚLTIMA plantilla
-// (la que suele tener variables). Si solo hay una, usa esa.
+// Previsualización: renderiza la fila elegida con la última plantilla
 // ─────────────────────────────────────────────────────────────────────────────
 const previewDocument = async (req, res) => {
     try {
-        const templateFiles = req.files['template'] || [];
-        const dataFile = req.files['data'] ? req.files['data'][0] : null;
+        const templateFiles = req.files && req.files['template'] ? req.files['template'] : [];
+        const dataRows = extractDataRows(req);
 
-        if (!templateFiles.length || !dataFile) {
-            return res.status(400).json({ error: 'Faltan archivos requeridos.' });
-        }
-
-        const dataRows = excelService.parseExcelBuffer(dataFile.buffer);
-        if (!dataRows || dataRows.length === 0) {
-            return res.status(400).json({ error: 'El Excel está vacío o no es válido.' });
+        if (!templateFiles.length || !dataRows || dataRows.length === 0) {
+            return res.status(400).json({ error: 'Faltan archivos o datos requeridos.' });
         }
 
         let rowIndex = parseInt(req.body.rowIndex || 0, 10);
@@ -170,10 +218,12 @@ const previewDocument = async (req, res) => {
             rowIndex = 0;
         }
 
-        // Previsualizar con la última plantilla subida (más probable que tenga variables)
+        const imagesMap = buildImagesMap(req);
+        const resolvedRow = resolveImageVariables(dataRows[rowIndex], imagesMap);
+
         const lastTemplate = templateFiles[templateFiles.length - 1];
         const svgWithFonts = await svgParserService.injectFontsToSVG(lastTemplate.buffer.toString('utf-8'));
-        const parsedSvg = svgParserService.replaceVariables(svgWithFonts, dataRows[rowIndex]);
+        const parsedSvg = svgParserService.replaceVariables(svgWithFonts, resolvedRow);
 
         const imgBuffer = await puppeteerService.renderToImage(parsedSvg, 'png');
         res.setHeader('Content-Type', 'image/png');
@@ -191,21 +241,19 @@ const previewDocument = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const debugSvg = async (req, res) => {
     try {
-        const templateFiles = req.files['template'] || [];
-        const dataFile = req.files['data'] ? req.files['data'][0] : null;
+        const templateFiles = req.files && req.files['template'] ? req.files['template'] : [];
+        const dataRows = extractDataRows(req);
 
-        if (!templateFiles.length || !dataFile) {
-            return res.status(400).json({ error: 'Faltan archivos requeridos.' });
+        if (!templateFiles.length || !dataRows || dataRows.length === 0) {
+            return res.status(400).json({ error: 'Faltan archivos o datos requeridos.' });
         }
 
-        const dataRows = excelService.parseExcelBuffer(dataFile.buffer);
-        if (!dataRows || dataRows.length === 0) {
-            return res.status(400).json({ error: 'El Excel está vacío o no es válido.' });
-        }
+        const imagesMap = buildImagesMap(req);
+        const resolvedRow = resolveImageVariables(dataRows[0], imagesMap);
 
         const lastTemplate = templateFiles[templateFiles.length - 1];
         const svgWithFonts = await svgParserService.injectFontsToSVG(lastTemplate.buffer.toString('utf-8'));
-        const parsedSvg = svgParserService.replaceVariables(svgWithFonts, dataRows[0]);
+        const parsedSvg = svgParserService.replaceVariables(svgWithFonts, resolvedRow);
 
         res.setHeader('Content-Type', 'image/svg+xml');
         return res.end(parsedSvg);

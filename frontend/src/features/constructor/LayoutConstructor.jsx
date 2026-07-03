@@ -1,9 +1,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, LayoutTemplate, Layers } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Sparkles, LayoutTemplate, Layers, Wand2 } from 'lucide-react';
 import './constructor.css'; // Tailwind inyectado aquí
 
 export default function LayoutConstructor({ children }) {
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  // Comprobar qué ruta está activa
+  const isStaticActive = pathname === '/' || pathname === '/servicios/diseno/creador-tarjetas/';
+  const isIaActive = pathname.includes('/variantes-ia');
+  const isConstructorActive = pathname.includes('/constructor');
 
   return (
     <div className="flex h-screen w-full bg-gray-50 overflow-hidden font-sans">
@@ -20,16 +28,47 @@ export default function LayoutConstructor({ children }) {
         </div>
 
         <nav className="flex-1 px-4 py-2 space-y-1">
-          <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
-            <LayoutTemplate size={18} />
-            <span className="text-sm font-medium">Generador Estático</span>
-          </a>
+          {/* Generador Estático */}
+          <Link 
+            to="/" 
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative overflow-hidden group ${
+              isStaticActive 
+                ? 'bg-orange-50 text-orange-garza font-semibold' 
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            {isStaticActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-garza rounded-r-full"></div>}
+            <LayoutTemplate size={18} className="relative z-10" />
+            <span className="text-sm relative z-10">Generador Estático</span>
+          </Link>
 
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-orange-50 text-orange-garza relative overflow-hidden group">
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-garza rounded-r-full"></div>
+          {/* Variantes IA (Nueva Herramienta Aparte) */}
+          <Link 
+            to="/variantes-ia" 
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative overflow-hidden group ${
+              isIaActive 
+                ? 'bg-orange-50 text-orange-garza font-semibold' 
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            {isIaActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-garza rounded-r-full"></div>}
+            <Wand2 size={18} className="relative z-10" />
+            <span className="text-sm relative z-10">Variantes IA</span>
+          </Link>
+
+          {/* Constructor IA */}
+          <Link 
+            to="/constructor" 
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative overflow-hidden group ${
+              isConstructorActive 
+                ? 'bg-orange-50 text-orange-garza font-semibold' 
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            {isConstructorActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-garza rounded-r-full"></div>}
             <Layers size={18} className="relative z-10" />
-            <span className="text-sm font-semibold relative z-10">Constructor IA</span>
-          </div>
+            <span className="text-sm relative z-10">Constructor IA</span>
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-gray-100 flex items-center gap-3">
@@ -46,9 +85,10 @@ export default function LayoutConstructor({ children }) {
         style={{ background: 'radial-gradient(circle at top right, #f3f4f6, #ffffff)' }}
       >
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          key={pathname}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
           className="h-full"
         >
           {children}

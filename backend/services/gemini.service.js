@@ -1,4 +1,4 @@
-﻿const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { IAInstructionSchema, ConceptosResponseSchema } = require('../schema/aiResponse.schema');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
@@ -231,7 +231,55 @@ async function generarInstrucciones(configurador, datosFila) {
   }
 }
 
+async function generateRowsWithAI(variables, referenceData, promptText, filePart = null) {
+  const prompt = `
+Eres un analista de datos experto y asistente de extracción de datos. Tu tarea es extraer y organizar información de los documentos de referencia en una lista de filas (objetos JSON) que se inyectarán en una plantilla de diseño.
+
+Tienes las siguientes variables (columnas) exactas que DEBES incluir como llaves en cada objeto JSON:
+${JSON.stringify(variables)}
+
+Aquí están los datos de referencia que debes procesar (pueden ser una lista de precios, fichas técnicas, copias, etc.):
+---
+${referenceData}
+---
+
+Instrucciones adicionales del usuario:
+"${promptText || 'Extrae los datos precisos y llena todas las variables correspondientes.'}"
+
+REGLAS CRÍTICAS DE EXTRACCIÓN Y MAPEO:
+1. Estructura de Filas: Dependiendo de los datos, un objeto JSON (fila) puede representar un solo producto, o puede representar un CONJUNTO completo de productos (ej. una hoja de "Lista de Precios Público" entera con decenas de variables para distintos modelos). Agrupa los datos lógicamente según el documento y las instrucciones del usuario.
+2. PRECISIÓN EXTREMA (¡NO DUPLICAR POR PEREZA!): Lee cuidadosamente el documento de referencia. Mapea cada variable con su valor exacto. Si ves variables como "NEX_1_110" y "NEO_1_110", busca la sección de "NEX" y la sección de "NEO" por separado en el documento. NUNCA copies y pegues el mismo precio/valor de un producto a otro a menos que el documento indique explícitamente que cuestan lo mismo.
+3. No cambies las mayúsculas/minúsculas ni la ortografía de las llaves.
+4. Si la llave corresponde a una imagen (logo, foto, img), propón un nombre de archivo lógico con extensión común (ej: "mirage_logo.png").
+5. Si la llave es un copy, eslogan o párrafo y no viene en los datos, genéralo creativamente adaptado al producto.
+6. Si un dato no existe en la referencia y no se puede inferir o inventar (como un precio específico), deja el campo vacío ("").
+7. Devuelve SOLO un array JSON válido de objetos. Sin markdown, sin comentarios.
+
+Ejemplo de salida esperada:
+[
+  { "tipo_lista": "Público", "NEX_1_110": "$5,210", "NEO_1_110": "$5,713", "logo": "mirage.png" },
+  { "tipo_lista": "Mayorista", "NEX_1_110": "$4,311", "NEO_1_110": "$4,872", "logo": "mirage.png" }
+];
+`;
+
+  const requestContent = [prompt];
+  if (filePart) {
+      requestContent.push(filePart);
+  }
+
+  const result = await retryWithBackoff(() => model.generateContent(requestContent));
+  const raw = cleanJson(result.response.text().trim());
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error('[Gemini] Error parseando JSON de filas generadas:', raw.slice(0, 800));
+    throw new Error('Gemini no devolvió un JSON válido al generar las filas de datos.');
+  }
+}
+
 module.exports = {
-  generarInstrucciones
+  generarInstrucciones,
+  generateRowsWithAI
 };
+
 

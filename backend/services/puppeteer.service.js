@@ -73,10 +73,14 @@ const renderToPdf = async (svgString) => {
             </html>
         `;
 
-        await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
+        await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'], timeout: 20000 });
 
         const dimensions = await setupSvgDimensions(page);
-        await page.setViewport({ width: dimensions.width, height: dimensions.height });
+        await page.setViewport({ 
+            width: dimensions.width, 
+            height: dimensions.height,
+            deviceScaleFactor: 3 // Aumentar resolución (3x) para mayor nitidez
+        });
 
         const pdfBuffer = await page.pdf({
             width: `${dimensions.width}px`,
@@ -120,13 +124,17 @@ const renderToImage = async (svgString, format = 'png') => {
             </html>
         `;
 
-        await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'] });
-        // Pequeña pausa para que foreignObject termine de pintarse
-        await new Promise(r => setTimeout(r, 150));
+        await page.setContent(html, { waitUntil: ['domcontentloaded', 'networkidle0'], timeout: 20000 });
+        // Pequeña pausa para que foreignObject y base64 terminen de decodificarse y pintarse
+        await new Promise(r => setTimeout(r, 300));
 
         const dimensions = await setupSvgDimensions(page);
         console.log('[puppeteer] Dimensiones detectadas:', dimensions);
-        await page.setViewport({ width: dimensions.width, height: dimensions.height });
+        await page.setViewport({ 
+            width: dimensions.width, 
+            height: dimensions.height,
+            deviceScaleFactor: 4 // Escalar 4x para obtener imágenes en muy alta resolución (aprox 300+ DPI)
+        });
 
         const svgElement = await page.$('svg');
         if (!svgElement) {
@@ -136,7 +144,7 @@ const renderToImage = async (svgString, format = 'png') => {
         const imgBuffer = await svgElement.screenshot({
             type: format === 'jpg' ? 'jpeg' : 'png',
             omitBackground: format === 'png',
-            quality: format === 'jpg' ? 90 : undefined
+            quality: format === 'jpg' ? 100 : undefined
         });
 
         await page.close();
@@ -202,7 +210,11 @@ const renderBatchToImage = async (svgArray, format = 'png') => {
             await new Promise(r => setTimeout(r, 150));
             
             const dimensions = await setupSvgDimensions(page);
-            await page.setViewport({ width: dimensions.width, height: dimensions.height });
+            await page.setViewport({ 
+                width: dimensions.width, 
+                height: dimensions.height,
+                deviceScaleFactor: 4 // Escalar 4x para el lote de imágenes
+            });
             
             const svgElement = await page.$('svg');
             if (!svgElement) throw new Error('No SVG element found');
@@ -210,7 +222,7 @@ const renderBatchToImage = async (svgArray, format = 'png') => {
             const imgBuffer = await svgElement.screenshot({
                 type: format === 'jpg' ? 'jpeg' : 'png',
                 omitBackground: format === 'png',
-                quality: format === 'jpg' ? 90 : undefined
+                quality: format === 'jpg' ? 100 : undefined
             });
             
             buffers.push(Buffer.from(imgBuffer));

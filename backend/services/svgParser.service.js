@@ -50,7 +50,7 @@ const injectFontsToSVG = async (svgString) => {
 // Extrae un atributo por nombre del string de atributos SVG.
 // ─────────────────────────────────────────────────────────────────────────────
 const getAttr = (attrs, name) => {
-    const re = new RegExp(`(?:^|\\s)${name}="([^"]*)"`, 'i');
+    const re = new RegExp(`(?:^|\\s)${name}\\s*=\\s*["']([^"']*)["']`, 'i');
     const m = attrs.match(re);
     return m ? m[1] : null;
 };
@@ -225,16 +225,59 @@ const replaceVariables = (svgString, rowData) => {
     const svgViewWidth = getSvgViewWidth(svgString);
     console.log(`[svgParser] ViewBox width: ${svgViewWidth}px`);
 
+    // Normalizar: quitar tildes, espacios, guiones y bajar a minúsculas para comparación robusta
+    const normalize = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+
     // Pre-procesar: unir tspans fragmentados por Illustrator
     let newSvg = preprocessSvgPlaceholders(svgString);
+
+    // ── Pre-procesar: Auto-conversión de etiquetas <image> estáticas a dinámicas ──
+    newSvg = newSvg.replace(/<image([^>]*?)>/gi, (match, imageAttrs) => {
+        let isSelfClosing = imageAttrs.trim().endsWith('/');
+        let cleanedAttrs = imageAttrs;
+        if (isSelfClosing) {
+            cleanedAttrs = cleanedAttrs.substring(0, cleanedAttrs.lastIndexOf('/'));
+        }
+
+        const id = getAttr(cleanedAttrs, 'id') || '';
+        const href = getAttr(cleanedAttrs, 'href') || getAttr(cleanedAttrs, 'xlink:href') || '';
+        
+        // Limpiar prefijos de Illustrator y guiones bajos redundantes del ID
+        const cleanId = id.trim().replace(/^_[xX][0-9a-fA-F]{2,4}_/g, '').replace(/^_+/, '').replace(/_+$/, '');
+        const idNorm = normalize(cleanId);
+        const hrefNorm = normalize(href);
+
+        for (const key of Object.keys(rowData)) {
+            const keyNorm = normalize(key);
+            const val = (rowData[key] || '').toString();
+            const valNorm = normalize(val);
+
+            // Evitar emparejamiento con claves muy cortas para no arruinar IDs
+            if (keyNorm.length < 3) continue;
+
+            // Heurísticas de emparejamiento más estrictas
+            const matchesId = idNorm && (idNorm === keyNorm || (idNorm.includes(keyNorm) && keyNorm.length > 4));
+            const matchesHref = hrefNorm && (hrefNorm === keyNorm || (hrefNorm.includes(keyNorm) && keyNorm.length > 4));
+            const matchesValue = valNorm && hrefNorm && (hrefNorm === valNorm || (hrefNorm.includes(valNorm) && valNorm.length > 4));
+
+            if (matchesId || matchesHref || matchesValue) {
+                console.log(`[svgParser] 🪄 Auto-vinculando <image> (id="${id}", href="${href}") a variable "{{${key}}}"`);
+                let updatedAttrs = cleanedAttrs;
+                updatedAttrs = updatedAttrs.replace(/xlink:href\s*=\s*["'][^"']*["']/gi, '');
+                updatedAttrs = updatedAttrs.replace(/href\s*=\s*["'][^"']*["']/gi, '');
+                updatedAttrs = `${updatedAttrs.trim()} href="{{${key}}}"`;
+                return isSelfClosing ? `<image ${updatedAttrs} />` : `<image ${updatedAttrs}>`;
+            }
+        }
+        return match;
+    });
 
     // ── Extraer todos los placeholders presentes en el SVG ──────────────────
     // Ejemplo: {{Puesto}}, {{Telefono}}, {{Correo}}, {{Nombre}}
     const svgPlaceholders = [...new Set((newSvg.match(/\{\{([^}]+)\}\}/g) || []))];
     console.log('[svgParser] Placeholders en SVG:', svgPlaceholders);
 
-    // Normalizar: quitar tildes y bajar a minúsculas para comparación
-    const normalize = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
 
     // Construir mapa: placeholderKey (como en SVG) → valor del Excel
     // Permite que columna "puesto" matchee con {{Puesto}}
@@ -459,5 +502,6 @@ const replaceVariables = (svgString, rowData) => {
 
 module.exports = {
     injectFontsToSVG,
-    replaceVariables
+    replaceVariables,
+    preprocessSvgPlaceholders
 };
