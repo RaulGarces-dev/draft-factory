@@ -44,3 +44,9 @@ Nunca debes subir archivos temporales pesados o confidenciales. Verifica siempre
 * Archivos `.FDB` (Bases de datos locales de Firebird/SAE) -> Deben ignorarse siempre.
 * Archivos `.env` o credenciales de APIs.
 * Caches de servicios (como `.wwebjs_auth/`, `.wwebjs_cache/`, `node_modules/`).
+
+### 📖 Paso 5: Documentación Continua e Incremental
+Con cada petición de commit o actualización importante:
+1. **Analizar Impacto:** Evalúa si la nueva funcionalidad o corrección altera las instrucciones de instalación, variables de entorno, o la lógica interna descrita en `docs/ARCHITECTURE.md`.
+2. **Actualización Obligatoria:** Actualiza el `README.md` (si afecta al usuario final) o `docs/ARCHITECTURE.md` (si es un cambio estructural o de API backend).
+3. **Commit de Documentación:** Incluye la actualización de la documentación en el mismo ciclo de commits del código para evitar desfases de información en GitHub.
