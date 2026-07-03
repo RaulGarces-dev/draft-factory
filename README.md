@@ -84,3 +84,8 @@ Vario Suite está diseñado para ser altamente extensible. Si deseas añadir una
 1. Crea una carpeta autocompatible bajo `frontend/src/features/mi-nueva-herramienta/`.
 2. Encapsula allí tus componentes, estilos CSS y hooks locales.
 3. Agrégalo al menú de enrutamiento en `frontend/src/App.jsx` y `VarioLayout.jsx`.
+
+---
+
+## 📖 Documentación Extendida y Desarrollo
+* **[Guía de Arquitectura de Software](file:///docs/ARCHITECTURE.md):** Revisa el documento de arquitectura para comprender el motor de parseo SVG, justificación de coordenadas, integración de IA y el pipeline de colas del backend.
