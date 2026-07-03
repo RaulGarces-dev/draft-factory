@@ -222,8 +222,10 @@ const previewDocument = async (req, res) => {
         const resolvedRow = resolveImageVariables(dataRows[rowIndex], imagesMap);
 
         const lastTemplate = templateFiles[templateFiles.length - 1];
+        require('fs').writeFileSync('debug_uploaded.svg', lastTemplate.buffer);
         const svgWithFonts = await svgParserService.injectFontsToSVG(lastTemplate.buffer.toString('utf-8'));
         const parsedSvg = svgParserService.replaceVariables(svgWithFonts, resolvedRow);
+        require('fs').writeFileSync('debug_parsed.svg', parsedSvg);
 
         const imgBuffer = await puppeteerService.renderToImage(parsedSvg, 'png');
         res.setHeader('Content-Type', 'image/png');

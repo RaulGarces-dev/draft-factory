@@ -206,6 +206,206 @@ const preprocessSvgPlaceholders = (svgString) => {
     });
 };
 
+// Estima de forma precisa el ancho de un texto basándose en pesos de ancho de caracteres.
+const estimateTextWidth = (text, fontSize) => {
+    let width = 0;
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (/[il1|'!;:,.\s]/.test(char)) {
+            width += fontSize * 0.25;
+        } else if (/[jrfkt()-]/.test(char)) {
+            width += fontSize * 0.35;
+        } else if (/[sabcdeghopquvxz0-9_]/.test(char)) {
+            width += fontSize * 0.5;
+        } else if (/[ABCDEFGHJKLNPQRSTUVXYZwmy]/.test(char)) {
+            width += fontSize * 0.7;
+        } else if (/[WM]/.test(char)) {
+            width += fontSize * 0.9;
+        } else {
+            width += fontSize * 0.52;
+        }
+    }
+    return width;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pre-procesa la alineación centrada y anchos personalizados para las variables.
+// Ejemplo: {{Fecha_salida|w:300}} o {{nombre_completo|center}} o {{puesto|center|w:400}}
+// ─────────────────────────────────────────────────────────────────────────────
+const preprocessFormattingFlags = (svgString) => {
+    let newSvg = svgString;
+    const customWidths = {};
+    const alignments = {};
+
+    // Helper para obtener font-size de clases o inline
+    const cssClasses = parseSvgCssClasses(newSvg);
+    const getFontSize = (attrs, parentAttrs = '') => {
+        const style = getAttr(attrs, 'style') || getAttr(parentAttrs, 'style') || '';
+        const sizeMatch = style.match(/font-size\s*:\s*([\d.]+)\s*(px|pt|em)?/i);
+        if (sizeMatch) return parseFloat(sizeMatch[1]);
+
+        const fontSizeAttr = getAttr(attrs, 'font-size') || getAttr(parentAttrs, 'font-size');
+        if (fontSizeAttr) return parseFloat(fontSizeAttr);
+
+        const cls = getAttr(attrs, 'class') || getAttr(parentAttrs, 'class') || '';
+        for (const c of cls.split(/\s+/)) {
+            if (cssClasses[c]?.fontSize) return cssClasses[c].fontSize;
+        }
+        return 12; // Fallback
+    };
+
+    // Procesamos bloque <text> por bloque <text> para no cruzar límites de etiquetas
+    const textBlockRegex = /<text([^>]*?)>((?:(?!<\/text>)[\s\S])*?)<\/text>/gi;
+    newSvg = newSvg.replace(textBlockRegex, (textMatch, textAttrs, textContent) => {
+        let updatedTextAttrs = textAttrs;
+        let updatedTextContent = textContent;
+
+        // Caso 1: Placeholders con flags dentro de un <tspan>
+        // Regex para buscar algo como {{nombre_completo|cen}} o {{fecha|w:300}}
+        const tspanRegex = /<tspan([^>]*?)>([^<]*)\{\{\s*([^|{}]+?)\s*\|([^{}]+?)\}\}([^<]*)<\/tspan>/gi;
+        updatedTextContent = updatedTextContent.replace(tspanRegex, (tspanMatch, tspanAttrs, tspanBefore, varName, flagsStr, tspanAfter) => {
+            const cleanVarName = varName.trim();
+            const flags = flagsStr.split('|').map(f => f.trim().toLowerCase());
+            
+            let isCenter = false;
+            let isRight = false;
+            
+            for (const flag of flags) {
+                if (flag === 'center' || flag === 'cen') {
+                    isCenter = true;
+                    alignments[cleanVarName] = 'center';
+                } else if (flag === 'der' || flag === 'right') {
+                    isRight = true;
+                    alignments[cleanVarName] = 'right';
+                } else if (flag === 'izq' || flag === 'left') {
+                    alignments[cleanVarName] = 'left';
+                } else if (flag.startsWith('w')) {
+                    const num = parseFloat(flag.replace(/[^0-9]/g, ''));
+                    if (!isNaN(num)) {
+                        customWidths[cleanVarName] = num;
+                    }
+                }
+            }
+
+            const fontSize = getFontSize(tspanAttrs, updatedTextAttrs);
+
+            if (isCenter || isRight) {
+                const anchorVal = isCenter ? 'middle' : 'end';
+                // Forzar text-anchor correcto
+                if (!updatedTextAttrs.includes('text-anchor')) {
+                    updatedTextAttrs = `${updatedTextAttrs} text-anchor="${anchorVal}"`;
+                } else {
+                    updatedTextAttrs = updatedTextAttrs.replace(/text-anchor\s*=\s*["'][^"']*["']/gi, `text-anchor="${anchorVal}"`);
+                }
+
+                // Desplazamiento X basado en el placeholder original
+                const origPlaceholderStr = `{{${cleanVarName}|${flagsStr}}}`;
+                const placeholderWidth = estimateTextWidth(origPlaceholderStr, fontSize);
+                const shiftFactor = isCenter ? 2 : 1; // 2 para centro, 1 (ancho completo) para derecha
+
+                const translateRegex = /translate\(\s*([\d.-]+)\s+([\d.-]+)\s*\)/i;
+                const translateCommaRegex = /translate\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)/i;
+                let matchTranslate = updatedTextAttrs.match(translateRegex) || updatedTextAttrs.match(translateCommaRegex);
+
+                if (matchTranslate) {
+                    const oldX = parseFloat(matchTranslate[1]);
+                    const oldY = parseFloat(matchTranslate[2]);
+                    const newX = oldX + (placeholderWidth / shiftFactor);
+                    const newTranslate = `translate(${newX.toFixed(2)} ${oldY.toFixed(2)})`;
+                    updatedTextAttrs = updatedTextAttrs.replace(matchTranslate[0], newTranslate);
+                } else {
+                    const xAttr = getAttr(updatedTextAttrs, 'x');
+                    if (xAttr) {
+                        const oldX = parseFloat(xAttr);
+                        const newX = oldX + (placeholderWidth / shiftFactor);
+                        updatedTextAttrs = updatedTextAttrs.replace(/x\s*=\s*["'][^"']*["']/i, `x="${newX.toFixed(2)}"`);
+                    } else {
+                        const tspanXAttr = getAttr(tspanAttrs, 'x');
+                        if (tspanXAttr) {
+                            const oldX = parseFloat(tspanXAttr);
+                            if (oldX !== 0) {
+                                const newX = oldX + (placeholderWidth / shiftFactor);
+                                tspanAttrs = tspanAttrs.replace(/x\s*=\s*["'][^"']*["']/i, `x="${newX.toFixed(2)}"`);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return `<tspan${tspanAttrs}>${tspanBefore}{{${cleanVarName}}}${tspanAfter}</tspan>`;
+        });
+
+        // Caso 2: Directo en <text> sin <tspan>
+        const directRegex = /([^<]*)\{\{\s*([^|{}]+?)\s*\|([^{}]+?)\}\}([^<]*)/gi;
+        updatedTextContent = updatedTextContent.replace(directRegex, (match, before, varName, flagsStr, after) => {
+            if (match.includes('<tspan') || match.includes('</tspan>')) return match; // ignorar si tiene tspan
+
+            const cleanVarName = varName.trim();
+            const flags = flagsStr.split('|').map(f => f.trim().toLowerCase());
+            
+            let isCenter = false;
+            let isRight = false;
+            
+            for (const flag of flags) {
+                if (flag === 'center' || flag === 'cen') {
+                    isCenter = true;
+                    alignments[cleanVarName] = 'center';
+                } else if (flag === 'der' || flag === 'right') {
+                    isRight = true;
+                    alignments[cleanVarName] = 'right';
+                } else if (flag === 'izq' || flag === 'left') {
+                    alignments[cleanVarName] = 'left';
+                } else if (flag.startsWith('w')) {
+                    const num = parseFloat(flag.replace(/[^0-9]/g, ''));
+                    if (!isNaN(num)) {
+                        customWidths[cleanVarName] = num;
+                    }
+                }
+            }
+
+            const fontSize = getFontSize('', updatedTextAttrs);
+
+            if (isCenter || isRight) {
+                const anchorVal = isCenter ? 'middle' : 'end';
+                if (!updatedTextAttrs.includes('text-anchor')) {
+                    updatedTextAttrs = `${updatedTextAttrs} text-anchor="${anchorVal}"`;
+                } else {
+                    updatedTextAttrs = updatedTextAttrs.replace(/text-anchor\s*=\s*["'][^"']*["']/gi, `text-anchor="${anchorVal}"`);
+                }
+
+                const origPlaceholderStr = `{{${cleanVarName}|${flagsStr}}}`;
+                const placeholderWidth = estimateTextWidth(origPlaceholderStr, fontSize);
+                const shiftFactor = isCenter ? 2 : 1;
+
+                const translateRegex = /translate\(\s*([\d.-]+)\s+([\d.-]+)\s*\)/i;
+                const translateCommaRegex = /translate\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)/i;
+                let matchTranslate = updatedTextAttrs.match(translateRegex) || updatedTextAttrs.match(translateCommaRegex);
+
+                if (matchTranslate) {
+                    const oldX = parseFloat(matchTranslate[1]);
+                    const oldY = parseFloat(matchTranslate[2]);
+                    const newX = oldX + (placeholderWidth / shiftFactor);
+                    const newTranslate = `translate(${newX.toFixed(2)} ${oldY.toFixed(2)})`;
+                    updatedTextAttrs = updatedTextAttrs.replace(matchTranslate[0], newTranslate);
+                } else {
+                    const xAttr = getAttr(updatedTextAttrs, 'x');
+                    if (xAttr) {
+                        const oldX = parseFloat(xAttr);
+                        const newX = oldX + (placeholderWidth / shiftFactor);
+                        updatedTextAttrs = updatedTextAttrs.replace(/x\s*=\s*["'][^"']*["']/i, `x="${newX.toFixed(2)}"`);
+                    }
+                }
+            }
+
+            return `${before}{{${cleanVarName}}}${after}`;
+        });
+
+        return `<text${updatedTextAttrs}>${updatedTextContent}</text>`;
+    });
+
+    return { cleanedSvg: newSvg, customWidths, alignments };
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Reemplaza variables {{CLAVE}} en el SVG.
 // Opera a nivel <tspan> individual para respetar la posición de cada elemento.
@@ -220,16 +420,32 @@ const replaceVariables = (svgString, rowData) => {
         return svgString;
     }
 
+    // Decodificar entidades hexadecimales de Illustrator en los IDs del SVG (ej: _x5F_ -> _)
+    let decodedSvg = svgString.replace(/id=["']([^"']+)["']/gi, (match, idVal) => {
+        const decoded = idVal.replace(/_x([0-9a-fA-F]{2,4})_/gi, (m, hex) => {
+            try {
+                return String.fromCharCode(parseInt(hex, 16));
+            } catch(e) {
+                return m;
+            }
+        });
+        return `id="${decoded}"`;
+    });
+
+    // Pre-procesar: unir tspans fragmentados por Illustrator antes de buscar alineaciones
+    let joinedSvg = preprocessSvgPlaceholders(decodedSvg);
+
+    // ── Pre-procesar alineaciones y límites de ancho ──
+    const { cleanedSvg, customWidths, alignments } = preprocessFormattingFlags(joinedSvg);
+    let newSvg = cleanedSvg;
+
     // Parsear CSS del SVG para obtener font-sizes reales
-    const cssClasses = parseSvgCssClasses(svgString);
-    const svgViewWidth = getSvgViewWidth(svgString);
+    const cssClasses = parseSvgCssClasses(newSvg);
+    const svgViewWidth = getSvgViewWidth(newSvg);
     console.log(`[svgParser] ViewBox width: ${svgViewWidth}px`);
 
     // Normalizar: quitar tildes, espacios, guiones y bajar a minúsculas para comparación robusta
     const normalize = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-
-    // Pre-procesar: unir tspans fragmentados por Illustrator
-    let newSvg = preprocessSvgPlaceholders(svgString);
 
     // ── Pre-procesar: Auto-conversión de etiquetas <image> estáticas a dinámicas ──
     newSvg = newSvg.replace(/<image([^>]*?)>/gi, (match, imageAttrs) => {
@@ -327,27 +543,38 @@ const replaceVariables = (svgString, rowData) => {
 
             const tspanClass = getAttr(tspanAttrs, 'class') || '';
 
-            // Buscar font-size en las clases del tspan; si no, usar font-size inline
+            // Buscar font-size en el tspan (atributo u hojas de estilo)
             let fontSize = null;
-            for (const cls of tspanClass.split(/\s+/)) {
-                if (cssClasses[cls]?.fontSize) {
-                    fontSize = cssClasses[cls].fontSize;
-                    break;
+            const tspanFontSizeAttr = getAttr(tspanAttrs, 'font-size');
+            if (tspanFontSizeAttr) {
+                fontSize = parseFloat(tspanFontSizeAttr);
+            } else {
+                for (const cls of tspanClass.split(/\s+/)) {
+                    if (cssClasses[cls]?.fontSize) {
+                        fontSize = cssClasses[cls].fontSize;
+                        break;
+                    }
                 }
             }
 
             // Si no encontramos en el tspan, buscar en el <text> padre (en el SVG actual)
             if (!fontSize) {
-                // Buscar el nodo <text> que contiene este tspan para obtener su clase
+                // Buscar el nodo <text> que contiene este tspan para obtener su clase o atributo
                 const surroundingMatch = newSvg.match(
                     new RegExp(`<text([^>]*)>[^<]*(?:<tspan[^>]*>[^<]*)*${match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i')
                 );
                 if (surroundingMatch) {
-                    const textClass = getAttr(surroundingMatch[1], 'class') || '';
-                    for (const cls of textClass.split(/\s+/)) {
-                        if (cssClasses[cls]?.fontSize) {
-                            fontSize = cssClasses[cls].fontSize;
-                            break;
+                    const textAttrsStr = surroundingMatch[1];
+                    const textFontSizeAttr = getAttr(textAttrsStr, 'font-size');
+                    if (textFontSizeAttr) {
+                        fontSize = parseFloat(textFontSizeAttr);
+                    } else {
+                        const textClass = getAttr(textAttrsStr, 'class') || '';
+                        for (const cls of textClass.split(/\s+/)) {
+                            if (cssClasses[cls]?.fontSize) {
+                                fontSize = cssClasses[cls].fontSize;
+                                break;
+                            }
                         }
                     }
                 }
@@ -359,16 +586,20 @@ const replaceVariables = (svgString, rowData) => {
                 console.warn(`[svgParser] ⚠️  font-size no encontrado para "${key}". Usando ${fontSize}px.`);
             }
 
-            const boxWidth = getBoxWidth(tspanAttrs, svgViewWidth);
+            const userCustomWidth = customWidths[key];
+            let boxWidth = userCustomWidth || getBoxWidth(tspanAttrs, svgViewWidth);
+            if ((alignments[key] === 'center' || alignments[key] === 'right') && !userCustomWidth) {
+                boxWidth = svgViewWidth * 0.85; // Ancho amplio si es centrado o alineado a la derecha
+            }
 
             // Determinar si es un campo de una sola línea (Nombre, Puesto, Correo, etc.)
             const singleLineKeys = ['nombre', 'puesto', 'telefono', 'correo', 'email', 'phone', 'celular', 'web', 'url', 'sitio', 'address', 'direccion'];
             const isSingleLine = singleLineKeys.some(k => normalize(key).includes(k)) || plainText.trim().length < 40 || !plainText.trim().includes(' ');
 
             if (isSingleLine) {
-                const textWidth = plainText.length * (fontSize * 0.52);
+                const textWidth = estimateTextWidth(plainText, fontSize);
                 if (textWidth > boxWidth) {
-                    let newFontSize = boxWidth / (plainText.length * 0.52);
+                    let newFontSize = (boxWidth / textWidth) * fontSize;
                     const minFontSize = fontSize * 0.5; // No reducir más del 50%
                     if (newFontSize < minFontSize) newFontSize = minFontSize;
                     newFontSize = Math.round(newFontSize * 100) / 100;
@@ -431,20 +662,29 @@ const replaceVariables = (svgString, rowData) => {
         newSvg = newSvg.replace(textNodeRegex, (match, attrs, content) => {
             matched = true;
             const plainText = content.replace(regex, val).trim();
-            const textClass = getAttr(attrs, 'class') || '';
+            const textFontSizeAttr = getAttr(attrs, 'font-size');
             let fontSize = 12;
-            for (const cls of textClass.split(/\s+/)) {
-                if (cssClasses[cls]?.fontSize) { fontSize = cssClasses[cls].fontSize; break; }
+            if (textFontSizeAttr) {
+                fontSize = parseFloat(textFontSizeAttr);
+            } else {
+                const textClass = getAttr(attrs, 'class') || '';
+                for (const cls of textClass.split(/\s+/)) {
+                    if (cssClasses[cls]?.fontSize) { fontSize = cssClasses[cls].fontSize; break; }
+                }
             }
 
-            const boxWidth = svgViewWidth * 0.45;
+            const userCustomWidth = customWidths[key];
+            let boxWidth = userCustomWidth || (svgViewWidth * 0.45);
+            if ((alignments[key] === 'center' || alignments[key] === 'right') && !userCustomWidth) {
+                boxWidth = svgViewWidth * 0.85;
+            }
             const singleLineKeys = ['nombre', 'puesto', 'telefono', 'correo', 'email', 'phone', 'celular', 'web', 'url', 'sitio', 'address', 'direccion'];
             const isSingleLine = singleLineKeys.some(k => normalize(key).includes(k));
 
             if (isSingleLine) {
-                const textWidth = plainText.length * (fontSize * 0.52);
+                const textWidth = estimateTextWidth(plainText, fontSize);
                 if (textWidth > boxWidth) {
-                    let newFontSize = boxWidth / (plainText.length * 0.52);
+                    let newFontSize = (boxWidth / textWidth) * fontSize;
                     const minFontSize = fontSize * 0.5;
                     if (newFontSize < minFontSize) newFontSize = minFontSize;
                     newFontSize = Math.round(newFontSize * 100) / 100;
@@ -491,6 +731,82 @@ const replaceVariables = (svgString, rowData) => {
             console.warn(`[svgParser] ⚠️  "${placeholder}" no encontrado en tspan/text. Reemplazo crudo.`);
             newSvg = newSvg.replace(regex, val);
         }
+    }
+
+    // ── Paso Extra: Reemplazo automático de colores por ID de capa de Illustrator ──
+    for (const key of Object.keys(rowData)) {
+        const val = (rowData[key] != null ? rowData[key] : '').toString().trim();
+        // Verificar si el valor parece ser un color hexadecimal o rgb
+        const isColor = /^#([0-9a-f]{3}){1,2}$/i.test(val) || /^rgb\(/i.test(val);
+        if (!isColor) continue;
+
+        const keyNorm = normalize(key);
+        // Match cualquier elemento que tenga id
+        const elementRegex = /<([^>\s]+)([^>]*?)\s+id=["']([^"']+)["']([^>]*?)>/gi;
+        
+        newSvg = newSvg.replace(elementRegex, (match, tagName, attrsBefore, idValue, attrsAfter) => {
+            const idNorm = normalize(idValue);
+            // Validar que el ID coincida con la clave (ej: color_franja -> colorfranja)
+            if (idNorm !== keyNorm && !idNorm.includes(keyNorm) && !keyNorm.includes(idNorm)) {
+                return match;
+            }
+            
+            console.log(`[svgParser] 🎨 Reemplazando color en elemento <${tagName}> con id="${idValue}" → ${val}`);
+            
+            let combinedAttrs = `${attrsBefore} ${attrsAfter}`.trim();
+            let isSelfClosing = false;
+            if (combinedAttrs.endsWith('/')) {
+                isSelfClosing = true;
+                combinedAttrs = combinedAttrs.slice(0, -1).trim();
+            }
+            
+            // Reemplazar o inyectar atributo fill
+            if (combinedAttrs.includes('fill=')) {
+                combinedAttrs = combinedAttrs.replace(/fill\s*=\s*["'][^"']*["']/gi, `fill="${val}"`);
+            } else {
+                combinedAttrs = `${combinedAttrs} fill="${val}"`;
+            }
+            
+            // Si el ID contiene palabras clave de contornos, también modificamos el stroke
+            const idLower = idValue.toLowerCase();
+            const isStrokeTarget = idLower.includes('stroke') || idLower.includes('borde') || idLower.includes('linea') || idLower.includes('contorno');
+            if (isStrokeTarget) {
+                if (combinedAttrs.includes('stroke=')) {
+                    combinedAttrs = combinedAttrs.replace(/stroke\s*=\s*["'][^"']*["']/gi, `stroke="${val}"`);
+                } else {
+                    combinedAttrs = `${combinedAttrs} stroke="${val}"`;
+                }
+            }
+
+            // Para forzar la prioridad sobre las clases CSS generadas por Illustrator, inyectamos en style inline
+            const styleAttr = getAttr(combinedAttrs, 'style');
+            if (styleAttr) {
+                let updatedStyle = styleAttr;
+                if (updatedStyle.includes('fill:')) {
+                    updatedStyle = updatedStyle.replace(/fill\s*:\s*[^;]+(;?)/gi, `fill: ${val}$1`);
+                } else {
+                    updatedStyle = updatedStyle.endsWith(';') ? `${updatedStyle} fill: ${val};` : `${updatedStyle}; fill: ${val};`;
+                }
+                
+                if (isStrokeTarget) {
+                    if (updatedStyle.includes('stroke:')) {
+                        updatedStyle = updatedStyle.replace(/stroke\s*:\s*[^;]+(;?)/gi, `stroke: ${val}$1`);
+                    } else {
+                        updatedStyle = updatedStyle.endsWith(';') ? `${updatedStyle} stroke: ${val};` : `${updatedStyle}; stroke: ${val};`;
+                    }
+                }
+                combinedAttrs = combinedAttrs.replace(`style="${styleAttr}"`, `style="${updatedStyle}"`);
+            } else {
+                let styleStr = `fill: ${val};`;
+                if (isStrokeTarget) {
+                    styleStr += ` stroke: ${val};`;
+                }
+                combinedAttrs = `${combinedAttrs} style="${styleStr}"`;
+            }
+
+            const closeTag = isSelfClosing ? ' />' : '>';
+            return `<${tagName} ${combinedAttrs.trim()} id="${idValue}"${closeTag}`;
+        });
     }
 
     const remaining = newSvg.match(/\{\{[^}]+\}\}/g);
