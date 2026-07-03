@@ -1,35 +1,143 @@
-:root {
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --color-bg: #ffffff;
-  --color-surface: rgba(255, 255, 255, 0.75);
-  --color-text: #1c1c1e;
-  --color-text-muted: #8e8e93;
-  --color-primary: #0B5A4B;
-  --color-primary-hover: #084438;
-  --color-accent: #F37021;
-  --color-accent-hover: #d95c14;
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-success: #34c759;
-  
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.02);
-  --shadow-md: 0 4px 14px rgba(11, 90, 75, 0.04);
-  --shadow-lg: 0 12px 30px rgba(11, 90, 75, 0.06);
-  --shadow-premium: 0 16px 40px rgba(11, 90, 75, 0.08);
-  
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+/* ==========================================================================
+   Vario Suite - Sistema de Diseño CSS Global (Tailwind v4 & shadcn)
+   ========================================================================== */
+
+/* Importar la base completa de Tailwind CSS v4 */
+@import "tailwindcss";
+
+/* 
+   Directiva @theme: Mapea variables CSS nativas a utilidades de Tailwind.
+   Esto permite usar clases como 'bg-primary', 'text-muted-foreground', etc.
+*/
+@theme {
+  /* Mapeo de colores semánticos basados en HSL (especificación shadcn) */
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  /* Color Primario de la Suite (Usado para botones principales y branding activo) */
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  /* Color Secundario (Fondos alternativos y botones secundarios) */
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  /* Destructivo (Alertas, errores, cancelaciones) */
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  /* Textos atenuados y estados inactivos */
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  /* Elementos de acento visuales */
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  /* Popups y elementos emergentes flotantes */
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  /* Contenedores tipo tarjeta */
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  /* Colores Corporativos Específicos de Vario Suite */
+  --color-vario-50: #f8fafc;
+  /* Fondo claro del workspace */
+  --color-vario-100: #f1f5f9;
+  /* Color base para hover inactivo */
+  --color-vario-800: #1e293b;
+  /* Fondo de Sidebar oscuro */
+  --color-vario-900: #0f172a;
+  /* Fondo oscuro del workspace */
+  --color-vario-accent: #745EEE;
+  /* Violeta acento principal */
+
+  /* Bordes redondeados responsivos */
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* Tipografía oficial */
+  --font-sans: 'Inter', sans-serif;
 }
 
-body, html {
-  margin: 0;
-  padding: 0;
-  font-family: var(--font-family);
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  -webkit-font-smoothing: antialiased;
+/* 
+   Capa Base de Selectores: Define los valores iniciales HSL de las variables CSS.
+   Estos valores se inyectan en el bloque @theme superior.
+*/
+@layer base {
+
+  /* Tema Claro (Default) */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Violeta Corporativo Vario Suite (249.5 82.5% 65.1%) */
+    --primary: 249.5 82.5% 65.1%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 249.5 82.5% 65.1%;
+    --radius: 0.5rem;
+  }
+
+  /* Tema Oscuro (Clase .dark en elemento HTML) */
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 249.5 82.5% 65.1%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 249.5 82.5% 65.1%;
+  }
 }
 
-* {
-  box-sizing: border-box;
+/* 
+   Estilos base globales para elementos nativos de HTML.
+*/
+@layer base {
+
+  /* Aplicar color de bordes por defecto basados en la variable CSS */
+  * {
+    @apply border-border;
+  }
+
+  /* Aplicar color de fondo y fuente predeterminada */
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
 }

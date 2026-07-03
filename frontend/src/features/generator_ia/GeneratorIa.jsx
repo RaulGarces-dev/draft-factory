@@ -249,10 +249,10 @@ const GeneratorIa = () => {
                     <header className={styles.header}>
                         <div className={styles.badge}>
                             <Sparkles size={12} className={styles.badgeIcon} />
-                            <span>Variantes IA V2</span>
+                            <span>Vario Suite Smart Tools</span>
                         </div>
-                        <h1 className={styles.title}>Variantes IA</h1>
-                        <p className={styles.subtitle}>Genera variantes masivas autocompletadas por IA a partir de tu SVG.</p>
+                        <h1 className={styles.title}>Variantes por IA</h1>
+                        <p className={styles.subtitle}>Generación y estructuración inteligente de variantes con asistencia de Gemini API.</p>
                     </header>
 
                     {/* Paso 1: SVG Template */}

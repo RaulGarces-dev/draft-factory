@@ -125,10 +125,10 @@ const Generator = () => {
                     <header className={styles.header}>
                         <div className={styles.badge}>
                             <Sparkles size={12} className={styles.badgeIcon} />
-                            <span>Diseño Premium V2</span>
+                            <span>Vario Suite Core</span>
                         </div>
-                        <h1 className={styles.title}>Creador de variantes</h1>
-                        <p className={styles.subtitle}>Carga un diseño plantilla SVG y tus datos Excel para generar credenciales corporativas.</p>
+                        <h1 className={styles.title}>Generador de Lotes</h1>
+                        <p className={styles.subtitle}>Procesamiento de plantillas de diseño SVG y datos en lote de manera directa y optimizada.</p>
                     </header>
 
                     <div className={styles.panel}>

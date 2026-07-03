@@ -43,7 +43,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(11, 90, 75, 0.08);
+    background: rgba(37, 99, 235, 0.08);
     color: var(--color-primary);
     padding: 4px 10px;
     border-radius: 100px;
@@ -81,7 +81,7 @@
     background: var(--color-surface);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.05);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
     padding: 24px;
@@ -115,12 +115,12 @@
 .segmentedControl {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    background-color: rgba(11, 90, 75, 0.06);
+    background-color: rgba(0, 0, 0, 0.04);
     padding: 3px;
     border-radius: 9px;
     position: relative;
     user-select: none;
-    border: 1px solid rgba(11, 90, 75, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.03);
 }
 
 .segmentBtn {
@@ -130,7 +130,7 @@
     text-align: center;
     font-size: 13px;
     font-weight: 500;
-    color: var(--color-primary);
+    color: var(--color-text-muted);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -166,7 +166,7 @@
     bottom: 0;
     background-color: var(--color-primary);
     border-radius: 7px;
-    box-shadow: 0 2px 6px rgba(11, 90, 75, 0.2);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
     z-index: 1;
 }
 
@@ -199,9 +199,13 @@
     transition: all 0.2s ease;
 }
 
+.previewBtn:hover:not(:disabled) {
+    background: rgba(37, 99, 235, 0.04);
+}
+
 .previewBtn:disabled {
-    border-color: var(--color-border);
-    color: var(--color-text-muted);
+    border-color: #e2e8f0;
+    color: #94a3b8;
     cursor: not-allowed;
 }
 
@@ -210,7 +214,7 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: var(--color-accent);
+    background: var(--color-primary);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -218,18 +222,18 @@
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(243, 112, 33, 0.25);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
     transition: all 0.2s ease;
 }
 
 .generateBtn:hover:not(:disabled) {
-    background: var(--color-accent-hover);
-    box-shadow: 0 6px 16px rgba(243, 112, 33, 0.35);
+    background: #1d4ed8;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
 }
 
 .generateBtn:disabled {
-    background: var(--color-border);
-    color: var(--color-text-muted);
+    background: #f1f5f9;
+    color: #94a3b8;
     box-shadow: none;
     cursor: not-allowed;
 }

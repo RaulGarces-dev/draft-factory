@@ -88,13 +88,13 @@ export default function ConstructorView() {
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 text-orange-garza text-sm font-semibold mb-4"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold mb-4"
         >
-          <Sparkles size={16} />
-          Motor IA Generativo
+          <Sparkles size={14} />
+          Motor Generativo Integrado
         </motion.div>
-        <h2 className="text-4xl font-extrabold text-petrol mb-3 tracking-tight">Constructor de Campañas</h2>
-        <p className="text-gray-500 text-lg max-w-2xl leading-relaxed">
+        <h2 className="text-3xl font-extrabold text-slate-800 mb-3 tracking-tight">Constructor de Campañas</h2>
+        <p className="text-slate-500 text-md max-w-2xl leading-relaxed">
           Sube tus reglas de marca y tu matriz de datos. La IA ensamblará, redactará y renderizará el lote completo automáticamente.
         </p>
       </header>

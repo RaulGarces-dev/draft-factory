@@ -1,7 +1,7 @@
 import React from 'react';
 import { Toaster } from 'sonner';
 import { Routes, Route } from 'react-router-dom';
-import LayoutConstructor from './features/constructor/LayoutConstructor';
+import VarioLayout from './components/layout/VarioLayout';
 import Generator from './features/generator/Generator';
 import GeneratorIa from './features/generator_ia/GeneratorIa';
 import ConstructorView from './features/constructor/ConstructorView';
@@ -12,33 +12,33 @@ function App() {
       <Toaster position="top-center" richColors />
       <Routes>
         {/* Generador Estático (Original) */}
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
-            <LayoutConstructor>
+            <VarioLayout>
               <Generator />
-            </LayoutConstructor>
-          } 
+            </VarioLayout>
+          }
         />
-        
+
         {/* Nueva herramienta: Variantes IA */}
-        <Route 
-          path="/variantes-ia" 
+        <Route
+          path="/variantes-ia"
           element={
-            <LayoutConstructor>
+            <VarioLayout>
               <GeneratorIa />
-            </LayoutConstructor>
-          } 
+            </VarioLayout>
+          }
         />
 
         {/* Constructor IA */}
-        <Route 
-          path="/constructor" 
+        <Route
+          path="/constructor"
           element={
-            <LayoutConstructor>
+            <VarioLayout>
               <ConstructorView />
-            </LayoutConstructor>
-          } 
+            </VarioLayout>
+          }
         />
       </Routes>
     </>
