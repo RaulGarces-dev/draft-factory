@@ -143,3 +143,98 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
+
+/* ============================================
+   Comparison Slider
+   ============================================ */
+.comparison-root {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  user-select: none;
+  cursor: col-resize;
+}
+.comparison-img {
+  display: block;
+  width: 100%;
+  height: 340px;
+  object-fit: contain;
+  background: #f8fafc;
+}
+.comparison-before-layer {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  overflow: hidden;
+}
+.comparison-before-layer .comparison-img {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  min-width: 100%;
+}
+/* Hack: forzar al img de before a tener el mismo ancho que el container completo */
+.comparison-before-layer {
+  width: var(--before-width, 50%);
+}
+.comparison-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 40px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: col-resize;
+}
+.comparison-line {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: white;
+  box-shadow: 0 0 8px rgba(124,58,237,0.4);
+}
+.comparison-knob {
+  position: relative;
+  z-index: 2;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 12px rgba(124,58,237,0.3);
+  display: flex; align-items: center; justify-content: center;
+  color: #7c3aed;
+  border: 2px solid rgba(124,58,237,0.2);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.comparison-knob:hover {
+  transform: scale(1.12);
+  box-shadow: 0 4px 20px rgba(124,58,237,0.4);
+}
+.comparison-label {
+  position: absolute;
+  bottom: 12px;
+  background: rgba(0,0,0,0.55);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 99px;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  text-transform: uppercase;
+}
+.comparison-label.left { left: 12px; }
+.comparison-label.right { right: 12px; }
+
+/* Progress bar real (sin animacion cuando tiene valor) */
+.progress-bar-inner {
+  transition: width 0.3s ease;
+}
