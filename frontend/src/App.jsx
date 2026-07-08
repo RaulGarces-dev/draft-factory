@@ -5,6 +5,7 @@ import VarioLayout from './components/layout/VarioLayout';
 import Generator from './features/generator/Generator';
 import GeneratorIa from './features/generator_ia/GeneratorIa';
 import ConstructorView from './features/constructor/ConstructorView';
+import UpscalerPage from './features/upscaler/UpscalerPage';
 
 function App() {
   return (
@@ -37,6 +38,16 @@ function App() {
           element={
             <VarioLayout>
               <ConstructorView />
+            </VarioLayout>
+          }
+        />
+
+        {/* Upscaler de Imágenes */}
+        <Route
+          path="/upscaler"
+          element={
+            <VarioLayout>
+              <UpscalerPage />
             </VarioLayout>
           }
         />

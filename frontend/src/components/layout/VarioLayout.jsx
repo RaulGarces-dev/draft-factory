@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutTemplate, Layers, Wand2 } from 'lucide-react';
+import { LayoutTemplate, Layers, Wand2, ImageUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function VarioLayout({ children }) {
@@ -11,12 +11,14 @@ export default function VarioLayout({ children }) {
   const isStaticActive = pathname === '/' || pathname === '/servicios/diseno/creador-tarjetas/';
   const isIaActive = pathname.includes('/variantes-ia');
   const isConstructorActive = pathname.includes('/constructor');
+  const isUpscalerActive = pathname.includes('/upscaler');
 
   // Obtener el título dinámico según la página activa
   let title = "Dashboard";
   if (isStaticActive) title = "Generador de Documentos Estáticos";
   if (isIaActive) title = "Generador de Variantes por IA";
   if (isConstructorActive) title = "Constructor Dinámico de Layouts";
+  if (isUpscalerActive) title = "Upscaler de Imágenes";
 
   return (
     <div className="flex h-screen w-full bg-vario-50 dark:bg-vario-900 font-sans overflow-hidden antialiased">
@@ -117,6 +119,31 @@ export default function VarioLayout({ children }) {
               </div>
             </motion.div>
           </Link>*/}
+
+          {/* Upscaler de Imágenes */}
+          <Link to="/upscaler" className="block relative">
+            <motion.div
+              whileHover={{ x: 4 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition-all duration-200 group relative ${isUpscalerActive
+                  ? 'bg-violet-50/70 text-violet-600 font-semibold shadow-[0_2px_8px_rgba(109,40,217,0.04)]'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+            >
+              {isUpscalerActive && (
+                <motion.div
+                  layoutId="activeNavIndicator"
+                  className="absolute left-0 top-2 bottom-2 w-1 bg-violet-600 rounded-r-full"
+                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                />
+              )}
+              <ImageUp size={18} className={isUpscalerActive ? 'text-violet-600' : 'text-slate-400 group-hover:text-slate-600'} />
+              <div className="flex flex-col">
+                <span className="text-sm">Upscaler de Imágenes</span>
+                <span className="text-[9px] text-slate-400 font-normal">Escalado local con Real-ESRGAN</span>
+              </div>
+            </motion.div>
+          </Link>
         </nav>
 
         {/* Footer Sidebar */}

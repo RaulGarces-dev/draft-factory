@@ -3,3 +3,6 @@ node_modules
 .env
 
 /generated/prisma
+
+# Binarios externos pesados (realesrgan-ncnn-vulkan)
+bin/realesrgan/
