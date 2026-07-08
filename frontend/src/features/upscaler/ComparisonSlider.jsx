@@ -1,23 +1,13 @@
-﻿import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 
 /**
  * ComparisonSlider — overlay arrastrable entre imagen original y escalada.
- * Ambas imagenes ocupan el 100% del contenedor; el clip revela la "before" a la izquierda.
+ * Utiliza clip-path para revelar la imagen escalada debajo de la original de forma precisa.
  */
 export default function ComparisonSlider({ before, after, scale }) {
     const [pos, setPos] = useState(50);
     const containerRef = useRef(null);
-    const [containerW, setContainerW] = useState(0);
     const dragging = useRef(false);
-
-    // Observar el ancho real del contenedor para el fix del before-img
-    useEffect(() => {
-        const ro = new ResizeObserver(([entry]) => {
-            setContainerW(entry.contentRect.width);
-        });
-        if (containerRef.current) ro.observe(containerRef.current);
-        return () => ro.disconnect();
-    }, []);
 
     const move = useCallback((clientX) => {
         const rect = containerRef.current?.getBoundingClientRect();
@@ -42,19 +32,17 @@ export default function ComparisonSlider({ before, after, scale }) {
             onMouseMove={(e) => { if (dragging.current) move(e.clientX); }}
             onTouchMove={(e) => { e.preventDefault(); move(e.touches[0].clientX); }}
         >
-            {/* AFTER — imagen escalada (fondo completo) */}
-            <img src={after} alt="Escalada" className="cs-img" draggable={false} />
+            {/* AFTER — imagen escalada (fondo) */}
+            <img src={after} alt="Escalada" className="cs-img cs-img-after" draggable={false} />
 
-            {/* BEFORE — imagen original: clip por width, img forzada al ancho del contenedor */}
-            <div className="cs-before-clip" style={{ width: `${pos}%` }}>
-                <img
-                    src={before}
-                    alt="Original"
-                    className="cs-img"
-                    draggable={false}
-                    style={{ width: containerW > 0 ? `${containerW}px` : '100%' }}
-                />
-            </div>
+            {/* BEFORE — imagen original (superpuesta y recortada con clip-path) */}
+            <img
+                src={before}
+                alt="Original"
+                className="cs-img cs-img-before"
+                draggable={false}
+                style={{ clipPath: `polygon(0 0, ${pos}% 0, ${pos}% 100%, 0 100%)` }}
+            />
 
             {/* Handle */}
             <div
@@ -77,3 +65,4 @@ export default function ComparisonSlider({ before, after, scale }) {
         </div>
     );
 }
+

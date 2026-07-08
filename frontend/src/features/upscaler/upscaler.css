@@ -161,8 +161,8 @@
   cursor: col-resize;
 }
 
-/* Imagen escalada — base, ocupa todo */
-.cs-root > .cs-img {
+/* Ambas imagenes ocupan el mismo espacio exacto */
+.cs-img {
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
@@ -170,23 +170,15 @@
   object-position: center;
 }
 
-/* Capa before — recorte por overflow:hidden, width controlado por JS */
-.cs-before-clip {
-  position: absolute;
-  top: 0; left: 0;
-  height: 100%;
-  overflow: hidden;
-  /* width viene del style inline */
+/* La imagen "before" tiene un z-index mas alto para estar por encima del "after" */
+.cs-img-before {
+  z-index: 10;
+  /* el clip-path se aplica de forma inline via JS en react */
 }
 
-/* Imagen original dentro del clip — ANCHO FIJO EN PX via style inline */
-.cs-before-clip .cs-img {
-  position: absolute;
-  top: 0; left: 0;
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
-  /* width viene del style inline (containerW px) */
+/* La imagen "after" va debajo (fondo) */
+.cs-img-after {
+  z-index: 5;
 }
 
 /* Handle — linea vertical + knob */
