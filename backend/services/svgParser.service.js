@@ -262,7 +262,7 @@ const preprocessFormattingFlags = (svgString) => {
 
         // Caso 1: Placeholders con flags dentro de un <tspan>
         // Regex para buscar algo como {{nombre_completo|cen}} o {{fecha|w:300}}
-        const tspanRegex = /<tspan([^>]*?)>([^<]*)\{\{\s*([^|{}]+?)\s*\|([^{}]+?)\}\}([^<]*)<\/tspan>/gi;
+        const tspanRegex = /<tspan([^>]*?)>((?:(?!<\/tspan>)[\s\S])*?)\{\{\s*([^|{}]+?)\s*\|([^{}]+?)\}\}([\s\S]*?)<\/tspan>/gi;
         updatedTextContent = updatedTextContent.replace(tspanRegex, (tspanMatch, tspanAttrs, tspanBefore, varName, flagsStr, tspanAfter) => {
             const cleanVarName = varName.trim();
             const flags = flagsStr.split('|').map(f => f.trim().toLowerCase());
@@ -291,6 +291,13 @@ const preprocessFormattingFlags = (svgString) => {
 
             if (isCenter || isRight) {
                 const anchorVal = isCenter ? 'middle' : 'end';
+                // Determinar el text-anchor original
+                let originalAnchor = 'start';
+                const anchorMatch = updatedTextAttrs.match(/text-anchor\s*=\s*["']([^"']+)["']/i) || tspanAttrs.match(/text-anchor\s*=\s*["']([^"']+)["']/i);
+                if (anchorMatch) {
+                    originalAnchor = anchorMatch[1].toLowerCase();
+                }
+
                 // Forzar text-anchor correcto
                 if (!updatedTextAttrs.includes('text-anchor')) {
                     updatedTextAttrs = `${updatedTextAttrs} text-anchor="${anchorVal}"`;
@@ -301,7 +308,15 @@ const preprocessFormattingFlags = (svgString) => {
                 // Desplazamiento X basado en el placeholder original
                 const origPlaceholderStr = `{{${cleanVarName}|${flagsStr}}}`;
                 const placeholderWidth = estimateTextWidth(origPlaceholderStr, fontSize);
-                const shiftFactor = isCenter ? 2 : 1; // 2 para centro, 1 (ancho completo) para derecha
+                
+                let shiftAmount = 0;
+                if (isCenter) {
+                    if (originalAnchor === 'start') shiftAmount = placeholderWidth / 2;
+                    else if (originalAnchor === 'end') shiftAmount = -(placeholderWidth / 2);
+                } else if (isRight) {
+                    if (originalAnchor === 'start') shiftAmount = placeholderWidth;
+                    else if (originalAnchor === 'middle') shiftAmount = placeholderWidth / 2;
+                }
 
                 const translateRegex = /translate\(\s*([\d.-]+)\s+([\d.-]+)\s*\)/i;
                 const translateCommaRegex = /translate\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)/i;
@@ -310,21 +325,21 @@ const preprocessFormattingFlags = (svgString) => {
                 if (matchTranslate) {
                     const oldX = parseFloat(matchTranslate[1]);
                     const oldY = parseFloat(matchTranslate[2]);
-                    const newX = oldX + (placeholderWidth / shiftFactor);
+                    const newX = oldX + shiftAmount;
                     const newTranslate = `translate(${newX.toFixed(2)} ${oldY.toFixed(2)})`;
                     updatedTextAttrs = updatedTextAttrs.replace(matchTranslate[0], newTranslate);
                 } else {
                     const xAttr = getAttr(updatedTextAttrs, 'x');
                     if (xAttr) {
                         const oldX = parseFloat(xAttr);
-                        const newX = oldX + (placeholderWidth / shiftFactor);
+                        const newX = oldX + shiftAmount;
                         updatedTextAttrs = updatedTextAttrs.replace(/x\s*=\s*["'][^"']*["']/i, `x="${newX.toFixed(2)}"`);
                     } else {
                         const tspanXAttr = getAttr(tspanAttrs, 'x');
                         if (tspanXAttr) {
                             const oldX = parseFloat(tspanXAttr);
                             if (oldX !== 0) {
-                                const newX = oldX + (placeholderWidth / shiftFactor);
+                                const newX = oldX + shiftAmount;
                                 tspanAttrs = tspanAttrs.replace(/x\s*=\s*["'][^"']*["']/i, `x="${newX.toFixed(2)}"`);
                             }
                         }
@@ -335,10 +350,9 @@ const preprocessFormattingFlags = (svgString) => {
             return `<tspan${tspanAttrs}>${tspanBefore}{{${cleanVarName}}}${tspanAfter}</tspan>`;
         });
 
-        // Caso 2: Directo en <text> sin <tspan>
-        const directRegex = /([^<]*)\{\{\s*([^|{}]+?)\s*\|([^{}]+?)\}\}([^<]*)/gi;
-        updatedTextContent = updatedTextContent.replace(directRegex, (match, before, varName, flagsStr, after) => {
-            if (match.includes('<tspan') || match.includes('</tspan>')) return match; // ignorar si tiene tspan
+        // Caso 2: Directo en <text> sin <tspan> o ignorado por tspanRegex
+        const directRegex = /\{\{\s*([^|{}]+?)\s*\|([^{}]+?)\}\}/gi;
+        updatedTextContent = updatedTextContent.replace(directRegex, (match, varName, flagsStr) => {
 
             const cleanVarName = varName.trim();
             const flags = flagsStr.split('|').map(f => f.trim().toLowerCase());
@@ -367,6 +381,13 @@ const preprocessFormattingFlags = (svgString) => {
 
             if (isCenter || isRight) {
                 const anchorVal = isCenter ? 'middle' : 'end';
+                // Determinar el text-anchor original
+                let originalAnchor = 'start';
+                const anchorMatch = updatedTextAttrs.match(/text-anchor\s*=\s*["']([^"']+)["']/i);
+                if (anchorMatch) {
+                    originalAnchor = anchorMatch[1].toLowerCase();
+                }
+
                 if (!updatedTextAttrs.includes('text-anchor')) {
                     updatedTextAttrs = `${updatedTextAttrs} text-anchor="${anchorVal}"`;
                 } else {
@@ -375,7 +396,15 @@ const preprocessFormattingFlags = (svgString) => {
 
                 const origPlaceholderStr = `{{${cleanVarName}|${flagsStr}}}`;
                 const placeholderWidth = estimateTextWidth(origPlaceholderStr, fontSize);
-                const shiftFactor = isCenter ? 2 : 1;
+                
+                let shiftAmount = 0;
+                if (isCenter) {
+                    if (originalAnchor === 'start') shiftAmount = placeholderWidth / 2;
+                    else if (originalAnchor === 'end') shiftAmount = -(placeholderWidth / 2);
+                } else if (isRight) {
+                    if (originalAnchor === 'start') shiftAmount = placeholderWidth;
+                    else if (originalAnchor === 'middle') shiftAmount = placeholderWidth / 2;
+                }
 
                 const translateRegex = /translate\(\s*([\d.-]+)\s+([\d.-]+)\s*\)/i;
                 const translateCommaRegex = /translate\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)/i;
@@ -384,20 +413,20 @@ const preprocessFormattingFlags = (svgString) => {
                 if (matchTranslate) {
                     const oldX = parseFloat(matchTranslate[1]);
                     const oldY = parseFloat(matchTranslate[2]);
-                    const newX = oldX + (placeholderWidth / shiftFactor);
+                    const newX = oldX + shiftAmount;
                     const newTranslate = `translate(${newX.toFixed(2)} ${oldY.toFixed(2)})`;
                     updatedTextAttrs = updatedTextAttrs.replace(matchTranslate[0], newTranslate);
                 } else {
                     const xAttr = getAttr(updatedTextAttrs, 'x');
                     if (xAttr) {
                         const oldX = parseFloat(xAttr);
-                        const newX = oldX + (placeholderWidth / shiftFactor);
+                        const newX = oldX + shiftAmount;
                         updatedTextAttrs = updatedTextAttrs.replace(/x\s*=\s*["'][^"']*["']/i, `x="${newX.toFixed(2)}"`);
                     }
                 }
             }
 
-            return `${before}{{${cleanVarName}}}${after}`;
+            return `{{${cleanVarName}}}`;
         });
 
         return `<text${updatedTextAttrs}>${updatedTextContent}</text>`;

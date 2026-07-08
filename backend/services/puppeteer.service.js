@@ -79,7 +79,7 @@ const renderToPdf = async (svgString) => {
         await page.setViewport({ 
             width: dimensions.width, 
             height: dimensions.height,
-            deviceScaleFactor: 3 // Aumentar resolución (3x) para mayor nitidez
+            deviceScaleFactor: 2 // Aumentar resolución (2x) para mayor nitidez sin saturar memoria
         });
 
         const pdfBuffer = await page.pdf({
@@ -133,7 +133,7 @@ const renderToImage = async (svgString, format = 'png') => {
         await page.setViewport({ 
             width: dimensions.width, 
             height: dimensions.height,
-            deviceScaleFactor: 4 // Escalar 4x para obtener imágenes en muy alta resolución (aprox 300+ DPI)
+            deviceScaleFactor: 2 // Escalar 2x para evitar desbordamiento de memoria (OOM) en el VPS
         });
 
         const svgElement = await page.$('svg');
