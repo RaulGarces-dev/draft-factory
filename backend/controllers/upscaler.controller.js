@@ -4,6 +4,11 @@ const { createJob, enqueue, getJob } = require('../services/upscaler.jobs');
 
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'webp'];
 
+// Limite en px del lado mayor antes del binario.
+// Imagenes ya grandes no ganan calidad perceptible con IA pero escalan el tiempo 10x.
+// 1500px = balance optimo calidad/velocidad.
+const MAX_INPUT_PX = 1500;
+
 // POST /api/upscaler/upscale — encola el trabajo, devuelve jobId inmediatamente
 async function upscale(req, res) {
     try {
@@ -14,8 +19,23 @@ async function upscale(req, res) {
             ? req.body.format.toLowerCase() : 'png';
         const outputFormat = fmt === 'jpg' ? 'jpeg' : fmt;
 
-        // Convertir a PNG para compatibilidad con el binario
-        const pngBuffer = await sharp(req.file.buffer).png().toBuffer();
+        // Pre-resize inteligente: reducir imagenes grandes antes del binario
+        const meta = await sharp(req.file.buffer).metadata();
+        const maxSide = Math.max(meta.width || 0, meta.height || 0);
+
+        let pngBuffer;
+        let wasResized = false;
+
+        if (maxSide > MAX_INPUT_PX) {
+            pngBuffer = await sharp(req.file.buffer)
+                .resize({ width: MAX_INPUT_PX, height: MAX_INPUT_PX, fit: 'inside', withoutEnlargement: true })
+                .png()
+                .toBuffer();
+            wasResized = true;
+            console.log(`[upscaler] Pre-resize: ${maxSide}px -> max ${MAX_INPUT_PX}px`);
+        } else {
+            pngBuffer = await sharp(req.file.buffer).png().toBuffer();
+        }
 
         const jobId = createJob(scale, outputFormat);
 
@@ -24,7 +44,8 @@ async function upscale(req, res) {
             return await sharp(upscaled)[outputFormat]({ quality: 95 }).toBuffer();
         });
 
-        res.json({ jobId, scale, format: outputFormat });
+        res.json({ jobId, scale, format: outputFormat, wasResized, originalSize: maxSide });
+
     } catch (err) {
         console.error('[upscaler] upscale:', err.message);
         res.status(500).json({ error: err.message });
@@ -54,7 +75,6 @@ function progress(req, res) {
             clearInterval(interval);
             return res.end();
         }
-        // Enviar snapshot sin el Buffer de resultado (demasiado grande)
         send({ status: job.status, progress: job.progress, position: job.position, error: job.error });
         if (job.status === 'done' || job.status === 'error') {
             clearInterval(interval);

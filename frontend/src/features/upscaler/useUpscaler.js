@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -28,7 +28,10 @@ export default function useUpscaler() {
 
             const res = await fetch(`${API}/upscaler/upscale`, { method: 'POST', body: form });
             if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
-            const { jobId } = await res.json();
+            const { jobId, wasResized } = await res.json();
+
+            // Informar si la imagen fue pre-reducida por ser muy grande
+            if (wasResized) patch({ wasResized: true });
 
             // Conectar al stream SSE de progreso
             const es = new EventSource(`${API}/upscaler/progress/${jobId}`);

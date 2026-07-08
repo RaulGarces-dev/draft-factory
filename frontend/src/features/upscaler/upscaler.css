@@ -1,4 +1,4 @@
-﻿/* ============================================
+/* ============================================
    Upscaler Module - Vario Suite
    ============================================ */
 
@@ -145,8 +145,106 @@
 }
 
 /* ============================================
-   Comparison Slider
+   Comparison Slider (cs-*)
+   Ambas imagenes apiladas; el clip revela before a la izquierda del handle.
    ============================================ */
+.cs-root {
+  position: relative;
+  width: 100%;
+  height: 380px;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background: #0f0f0f;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  user-select: none;
+  cursor: col-resize;
+}
+
+/* Imagen escalada — base, ocupa todo */
+.cs-root > .cs-img {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+/* Capa before — recorte por overflow:hidden, width controlado por JS */
+.cs-before-clip {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  overflow: hidden;
+  /* width viene del style inline */
+}
+
+/* Imagen original dentro del clip — ANCHO FIJO EN PX via style inline */
+.cs-before-clip .cs-img {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  /* width viene del style inline (containerW px) */
+}
+
+/* Handle — linea vertical + knob */
+.cs-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 44px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  cursor: col-resize;
+}
+.cs-line {
+  position: absolute;
+  inset: 0;
+  left: 50%; right: auto;
+  width: 2px;
+  background: white;
+  box-shadow: 0 0 10px rgba(124,58,237,0.5);
+}
+.cs-knob {
+  position: relative;
+  z-index: 21;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+  display: flex; align-items: center; justify-content: center;
+  color: #7c3aed;
+  border: 2px solid rgba(124,58,237,0.25);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.cs-knob:hover { transform: scale(1.1); box-shadow: 0 4px 24px rgba(124,58,237,0.4); }
+
+/* Labels flotantes */
+.cs-label {
+  position: absolute;
+  bottom: 14px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 99px;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  text-transform: uppercase;
+  z-index: 15;
+}
+.cs-label-left  { left: 14px; }
+.cs-label-right { right: 14px; }
+
+/* Progress bar — transicion suave cuando tiene valor real */
+.progress-bar-inner { transition: width 0.25s ease; }
+
 .comparison-root {
   position: relative;
   width: 100%;

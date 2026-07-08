@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, ImageUp, ArrowRight, X, ImageIcon, Clock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ export default function UpscalerPage() {
     const [scale, setScale] = useState('4');
     const [format, setFormat] = useState('png');
 
-    const { status, progress, position, resultUrl, resultName, error, submit, reset, download } = useUpscaler();
+    const { status, progress, position, resultUrl, resultName, error, wasResized, submit, reset, download } = useUpscaler();
 
     function handleFile(f) {
         setFile(f);
@@ -133,6 +133,11 @@ export default function UpscalerPage() {
                                         <div className="progress-bar-inner" style={{ width: `${progress}%`, animation: 'none' }} />
                                     </div>
                                     <p className="text-[10px] text-center text-slate-400 mt-1">Usando modelo realesrgan-x{scale}plus · GPU Vulkan</p>
+                                    {wasResized && (
+                                        <p className="text-[10px] text-center text-amber-500 font-medium mt-1">
+                                            ⚡ Imagen pre-reducida a 1500px para optimizar velocidad
+                                        </p>
+                                    )}
                                 </div>
                             </motion.div>
                         )}
