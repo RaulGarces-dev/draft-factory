@@ -4,5 +4,5 @@ node_modules
 
 /generated/prisma
 
-# Binarios externos pesados (realesrgan-ncnn-vulkan)
-bin/realesrgan/
+# Binarios permitidos para simplificar el despliegue
+# bin/realesrgan/
