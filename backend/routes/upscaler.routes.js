@@ -1,7 +1,7 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { upscale, progress, result } = require('../controllers/upscaler.controller');
+const { upscale, progress, inputImage, result } = require('../controllers/upscaler.controller');
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -16,6 +16,7 @@ const upload = multer({
 
 router.post('/upscale', upload.single('image'), upscale);
 router.get('/progress/:jobId', progress);
+router.get('/input/:jobId', inputImage);
 router.get('/result/:jobId', result);
 
 module.exports = router;

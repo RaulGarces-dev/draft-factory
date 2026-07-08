@@ -1,4 +1,4 @@
-﻿/**
+/**
  * upscaler.jobs.js
  * Cola in-memory para procesamiento de imagenes — sin base de datos (privacy-first).
  * Los resultados se limpian automaticamente a los 10 minutos.
@@ -17,6 +17,7 @@ function createJob(scale, format) {
         position: queue.length + 1,
         scale,
         format,
+        input: null,   // PNG pre-procesado enviado al binario (para el slider)
         result: null,
         error: null,
     });
@@ -62,4 +63,9 @@ function getJob(id) {
     return jobs.get(id) || null;
 }
 
-module.exports = { createJob, enqueue, getJob };
+function setInput(id, buffer) {
+    const job = jobs.get(id);
+    if (job) job.input = buffer;
+}
+
+module.exports = { createJob, enqueue, getJob, setInput };

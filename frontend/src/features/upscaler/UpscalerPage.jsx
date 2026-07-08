@@ -16,7 +16,7 @@ export default function UpscalerPage() {
     const [scale, setScale] = useState('4');
     const [format, setFormat] = useState('png');
 
-    const { status, progress, position, resultUrl, resultName, error, wasResized, submit, reset, download } = useUpscaler();
+    const { status, progress, position, resultUrl, inputUrl, resultName, error, wasResized, submit, reset, download } = useUpscaler();
 
     function handleFile(f) {
         setFile(f);
@@ -143,9 +143,9 @@ export default function UpscalerPage() {
                         )}
 
                         {/* Estado: Listo — Slider comparacion */}
-                        {status === 'done' && preview && resultUrl && (
+                        {status === 'done' && inputUrl && resultUrl && (
                             <motion.div key="done" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4">
-                                <ComparisonSlider before={preview} after={resultUrl} scale={scale} />
+                                <ComparisonSlider before={inputUrl} after={resultUrl} scale={scale} />
                                 <motion.button initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                                     onClick={download}
                                     className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm transition-all shadow-md shadow-emerald-500/20">

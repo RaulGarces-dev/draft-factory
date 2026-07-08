@@ -1,6 +1,6 @@
-﻿const sharp = require('sharp');
+const sharp = require('sharp');
 const { upscaleImage } = require('../services/upscaler.service');
-const { createJob, enqueue, getJob } = require('../services/upscaler.jobs');
+const { createJob, enqueue, getJob, setInput } = require('../services/upscaler.jobs');
 
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'webp'];
 
@@ -38,6 +38,7 @@ async function upscale(req, res) {
         }
 
         const jobId = createJob(scale, outputFormat);
+        setInput(jobId, pngBuffer); // Guardar input para el slider de comparacion
 
         enqueue(jobId, async (onProgress) => {
             const upscaled = await upscaleImage(pngBuffer, scale, onProgress);
@@ -85,6 +86,15 @@ function progress(req, res) {
     req.on('close', () => clearInterval(interval));
 }
 
+// GET /api/upscaler/input/:jobId — devuelve el PNG pre-procesado (para slider "before")
+function inputImage(req, res) {
+    const { jobId } = req.params;
+    const job = getJob(jobId);
+    if (!job || !job.input) return res.status(404).json({ error: 'Input no disponible.' });
+    res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
+    res.send(job.input);
+}
+
 // GET /api/upscaler/result/:jobId — devuelve la imagen procesada
 function result(req, res) {
     const { jobId } = req.params;
@@ -102,4 +112,4 @@ function result(req, res) {
     res.send(job.result);
 }
 
-module.exports = { upscale, progress, result };
+module.exports = { upscale, progress, inputImage, result };

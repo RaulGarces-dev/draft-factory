@@ -42,14 +42,20 @@ export default function useUpscaler() {
 
                 if (job.status === 'done') {
                     es.close();
-                    // Bajar resultado como blob para download cross-origin
+                    // Descargar resultado como blob
                     const imgRes = await fetch(`${API}/upscaler/result/${jobId}`);
                     const blob = await imgRes.blob();
                     const ext = format === 'jpeg' ? 'jpg' : format;
+
+                    // Descargar input pre-procesado para el slider (mismas dimensiones base que el resultado)
+                    const inpRes = await fetch(`${API}/upscaler/input/${jobId}`);
+                    const inpBlob = await inpRes.blob();
+
                     patch({
                         status: 'done',
                         progress: 100,
                         resultUrl: URL.createObjectURL(blob),
+                        inputUrl: URL.createObjectURL(inpBlob),
                         resultName: `upscaled_${scale}x.${ext}`,
                     });
                 } else if (job.status === 'error') {
