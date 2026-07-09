@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const INITIAL = { status: 'idle', progress: 0, position: 0, resultUrl: null, resultName: null, error: null };
 
@@ -15,7 +15,7 @@ export default function useUpscaler() {
         setState(INITIAL);
     }, []);
 
-    const submit = useCallback(async (file, scale, format) => {
+    const submit = useCallback(async (file, quality, format) => {
         if (!file) return;
         esRef.current?.close();
         patch({ status: 'queued', progress: 0, position: 1, resultUrl: null, error: null });
@@ -23,55 +23,60 @@ export default function useUpscaler() {
         try {
             const form = new FormData();
             form.append('image', file);
-            form.append('scale', scale);
+            form.append('quality', quality);
             form.append('format', format);
 
-            const res = await fetch(`${API}/upscaler/upscale`, { method: 'POST', body: form });
+            const res = await fetch(`${API_URL}/api/upscaler/upscale`, { method: 'POST', body: form });
+            
+            const contentType = res.headers.get('content-type');
+            if (contentType && contentType.indexOf('application/json') === -1) {
+                throw new Error(`Error de servidor (HTML). Código: ${res.status}. Posible causa: Nginx o Node.js caído.`);
+            }
+
             if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
-            const { jobId, wasResized } = await res.json();
+            const { jobId } = await res.json();
 
-            // Informar si la imagen fue pre-reducida por ser muy grande
-            if (wasResized) patch({ wasResized: true });
+            // Polling cada 2 segundos en lugar de SSE para evitar timeouts de Nginx
+            const poll = setInterval(async () => {
+                try {
+                    const pollRes = await fetch(`${API_URL}/api/upscaler/progress/${jobId}`);
+                    if (!pollRes.ok) return; // Ignorar fallos temporales de red
+                    const job = await pollRes.json();
 
-            // Conectar al stream SSE de progreso
-            const es = new EventSource(`${API}/upscaler/progress/${jobId}`);
-            esRef.current = es;
+                    if (job.status === 'done') {
+                        clearInterval(poll);
+                        
+                        const imgRes = await fetch(`${API_URL}/api/upscaler/result/${jobId}`);
+                        const blob = await imgRes.blob();
+                        const ext = format === 'jpeg' ? 'jpg' : format;
 
-            es.onmessage = async (e) => {
-                const job = JSON.parse(e.data);
+                        const inpRes = await fetch(`${API_URL}/api/upscaler/input/${jobId}`);
+                        const inpBlob = await inpRes.blob();
 
-                if (job.status === 'done') {
-                    es.close();
-                    // Descargar resultado como blob
-                    const imgRes = await fetch(`${API}/upscaler/result/${jobId}`);
-                    const blob = await imgRes.blob();
-                    const ext = format === 'jpeg' ? 'jpg' : format;
-
-                    // Descargar input pre-procesado para el slider (mismas dimensiones base que el resultado)
-                    const inpRes = await fetch(`${API}/upscaler/input/${jobId}`);
-                    const inpBlob = await inpRes.blob();
-
-                    patch({
-                        status: 'done',
-                        progress: 100,
-                        resultUrl: URL.createObjectURL(blob),
-                        inputUrl: URL.createObjectURL(inpBlob),
-                        resultName: `upscaled_${scale}x.${ext}`,
-                    });
-                } else if (job.status === 'error') {
-                    es.close();
-                    patch({ status: 'error', error: job.error });
-                } else if (job.status === 'processing') {
-                    patch({ status: 'processing', progress: job.progress });
-                } else if (job.status === 'queued') {
-                    patch({ status: 'queued', position: job.position });
+                        patch({
+                            status: 'done',
+                            progress: 100,
+                            resultUrl: URL.createObjectURL(blob),
+                            inputUrl: URL.createObjectURL(inpBlob),
+                            resultName: `upscaled_${quality}.${ext}`,
+                        });
+                    } else if (job.status === 'error') {
+                        clearInterval(poll);
+                        patch({ status: 'error', error: job.error });
+                    } else if (job.status === 'processing') {
+                        patch({ status: 'processing', progress: job.progress });
+                    } else if (job.status === 'queued') {
+                        patch({ status: 'queued', position: job.position });
+                    }
+                } catch (e) {
+                    console.warn("Fallo temporal de polling:", e);
+                    // No cortamos la conexión, reintentará en 2 segundos
                 }
-            };
+            }, 2000);
 
-            es.onerror = () => {
-                es.close();
-                patch({ status: 'error', error: 'Conexion perdida con el servidor.' });
-            };
+            // Guardamos el interval en ref para poder cancelarlo en unmont/reset
+            esRef.current = { close: () => clearInterval(poll) };
+
         } catch (err) {
             patch({ status: 'error', error: err.message });
         }

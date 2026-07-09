@@ -49,8 +49,8 @@ export default function VarioLayout({ children }) {
               whileHover={{ x: 4 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
               className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition-all duration-200 group relative ${isStaticActive
-                  ? 'bg-violet-50/70 text-violet-600 font-semibold shadow-[0_2px_8px_rgba(109,40,217,0.04)]'
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                ? 'bg-violet-50/70 text-violet-600 font-semibold shadow-[0_2px_8px_rgba(109,40,217,0.04)]'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                 }`}
             >
               {isStaticActive && (
@@ -126,8 +126,8 @@ export default function VarioLayout({ children }) {
               whileHover={{ x: 4 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
               className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition-all duration-200 group relative ${isUpscalerActive
-                  ? 'bg-violet-50/70 text-violet-600 font-semibold shadow-[0_2px_8px_rgba(109,40,217,0.04)]'
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                ? 'bg-violet-50/70 text-violet-600 font-semibold shadow-[0_2px_8px_rgba(109,40,217,0.04)]'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                 }`}
             >
               {isUpscalerActive && (
@@ -169,13 +169,7 @@ export default function VarioLayout({ children }) {
             <h1 className="text-md font-semibold text-slate-800 dark:text-white leading-none mb-1">{title}</h1>
             <span className="text-[10px] text-slate-400">Vario Suite v1.0.0 (PMI)</span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">Local DB Connected</span>
-            <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-              <div className="h-2 w-2 rounded-full bg-violet-500"></div>
-            </div>
-          </div>
+
         </header>
 
         {/* Área de Trabajo */}

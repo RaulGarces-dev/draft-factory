@@ -26,38 +26,92 @@ if (!fs_sync.existsSync(BIN_PATH)) {
     console.warn(`[upscaler] y coloca el binario en backend/bin/realesrgan/ con chmod +x`);
 }
 
+require('dotenv').config();
+
 /**
  * Escala una imagen con realesrgan reportando progreso real via onProgress.
- * @param {Buffer} imageBuffer
+ * Guarda el input y el output directamente a disco en una carpeta temporal.
+ * @param {Buffer} imageBuffer - PNG base
  * @param {string} scale - '2' | '4'
+ * @param {string} format - 'jpg' | 'png' | 'webp'
  * @param {Function} onProgress - callback(percent: number)
- * @returns {Promise<Buffer>}
+ * @returns {Promise<{ inputPath: string, outputPath: string }>} Rutas a los archivos
  */
-async function upscaleImage(imageBuffer, scale = '4', onProgress = () => {}) {
+async function upscaleImage(imageBuffer, scale = '4', format = 'png', onProgress = () => {}) {
     const id = crypto.randomUUID();
+    const ext = format === 'jpeg' ? 'jpg' : format;
     const tmpDir = os.tmpdir();
-    const inputPath = path.join(tmpDir, `realesr_in_${id}.png`);
-    const outputPath = path.join(tmpDir, `realesr_out_${id}.png`);
+    const inputPath = path.join(tmpDir, `vario_realesr_in_${id}.png`);
+    const outputPath = path.join(tmpDir, `vario_realesr_out_${id}.${ext}`);
     const modelName = MODEL_MAP[scale] || MODEL_MAP['4'];
 
-    try {
-        await fs.writeFile(inputPath, imageBuffer);
-        await runBinary(inputPath, outputPath, scale, modelName, onProgress);
-        return await fs.readFile(outputPath);
-    } finally {
-        await fs.unlink(inputPath).catch(() => {});
-        await fs.unlink(outputPath).catch(() => {});
+    await fs.writeFile(inputPath, imageBuffer);
+    
+    // Switch Inteligente: Buscamos la URL de Modal en el archivo .env
+    const modalUrl = process.env.MODAL_WEBHOOK_URL;
+
+    if (modalUrl) {
+        try {
+            onProgress(10); // Iniciando puente a nube gráfica
+            const imageB64 = imageBuffer.toString('base64');
+            onProgress(20);
+            
+            // Enviar la imagen a Modal Serverless
+            const res = await fetch(modalUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_base64: imageB64,
+                    scale: scale,
+                    format: ext
+                })
+            });
+            onProgress(80); // Respuesta recibida
+            
+            if (!res.ok) throw new Error(`Modal HTTP error: ${res.statusText}`);
+            
+            const data = await res.json();
+            if (data.status !== 'success') throw new Error('Modal process failed');
+            
+            // Reconstruir la imagen final
+            const resultBuffer = Buffer.from(data.result_b64, 'base64');
+            await fs.writeFile(outputPath, resultBuffer);
+            onProgress(100);
+            return { inputPath, outputPath };
+
+        } catch (error) {
+            console.warn(`[upscaler] Modal API falló (${error.message}). Haciendo fallback a binario local lento...`);
+            // Si la nube falla (ej. sin saldo), cae al binario de CPU para nunca romper la web
+            await runBinary(inputPath, outputPath, scale, modelName, ext, onProgress);
+            return { inputPath, outputPath };
+        }
+    } else {
+        // Modo Normal: Si el admin no configuró Modal en su .env, usar binario local
+        await runBinary(inputPath, outputPath, scale, modelName, ext, onProgress);
+        return { inputPath, outputPath };
     }
 }
 
-function runBinary(inputPath, outputPath, scale, modelName, onProgress) {
+function runBinary(inputPath, outputPath, scale, modelName, format, onProgress) {
     return new Promise((resolve, reject) => {
-        const args = ['-i', inputPath, '-o', outputPath, '-s', scale, '-n', modelName, '-m', MODELS_DIR];
+        // Mantenemos -t 256 que es lo que realmente da la velocidad al procesar
+        // trozos mas grandes. Retiramos -g -1 y -j 4:4:4 que causaron crash (código 255)
+        // en el servidor KVM de 2 nucleos.
+        const args = [
+            '-i', inputPath, 
+            '-o', outputPath, 
+            '-s', scale, 
+            '-n', modelName, 
+            '-m', MODELS_DIR, 
+            '-t', '256', 
+            '-f', format
+        ];
+        
         const child = spawn(BIN_PATH, args);
 
-        // El binario emite progreso en stderr como "x.xx%"
         child.stderr.on('data', (data) => {
-            const match = data.toString().match(/(\d+(?:\.\d+)?)%/);
+            const out = data.toString();
+            const match = out.match(/(\d+(?:\.\d+)?)%/);
             if (match) onProgress(Math.min(parseFloat(match[1]), 99));
         });
 
