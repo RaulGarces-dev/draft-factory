@@ -65,6 +65,20 @@ Este módulo utiliza modelos fundacionales para diseñar o alterar la estructura
 
 ---
 
+## 🖼️ Módulo 3: Súper Resolución y Escalado de Imágenes (Upscaler)
+
+Este módulo permite a diseñadores y usuarios aumentar la resolución de imágenes pixeladas sin pérdida de fidelidad visual utilizando redes neuronales convolucionales.
+
+### 1. Motor Híbrido de Escalado (Local y Cloud):
+* **Escalado Local (Vulkan/NCNN):** Integra la versión portable y nativa de **RealESRGAN** (`realesrgan-ncnn-vulkan`) utilizando la GPU local para realizar un escalado rápido de x2, x3 o x4 (con modelos especializados para fotografías generales y animación digital/ilustración).
+* **Escalado Cloud (Modal Network):** Para equipos sin tarjetas gráficas dedicadas, incluye un script Python (`modal_upscaler.py`) diseñado para levantar una GPU virtual bajo demanda en la nube de Modal, delegando el cómputo y retornando la imagen escalada en segundos.
+
+### 2. Procesamiento por Lotes y Vista Comparativa:
+* **Previsualización interactiva:** El cliente React cuenta con una vista comparativa tipo deslizador (`ComparisonSlider.jsx`) para contrastar el "Antes" y "Después" de forma dinámica sobre la misma imagen.
+* **Procesamiento Asíncrono en Lote:** Mapeo de múltiples imágenes en una cola de tareas (`upscaler.jobs.js`) que procesa por lotes para evitar el sobrecalentamiento del hardware local en colas masivas.
+
+---
+
 ## 📦 Sistema de Colas para Procesamiento por Lotes
 
 Para prevenir la saturación de memoria en servidores de pocos recursos al procesar miles de registros simultáneamente (lotes de Excel de más de 500 filas):
